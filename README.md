@@ -28,3 +28,9 @@ Make sure you use the latest snapshots (21w15a+)!
  4. Start the game and enter into a world (a superflat with the void preset is a good starting point, as most normal worlds don't work)
  5. Go into video settings and set Graphics to _Fabulous!_
  6. Go into resource packs and enable the path tracing resource pack. Make sure to disable anything else, even if they don't have shaders.
+
+## Examples
+
+![example1](images/example1.png)
+
+![example2](images/example2.png)
