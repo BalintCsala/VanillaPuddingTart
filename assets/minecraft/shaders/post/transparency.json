@@ -1,0 +1,39 @@
+{
+    "targets": [
+        "water",
+        "translucent",
+        "itemEntity",
+        "particles",
+        "clouds",
+        "weather",
+        "final"
+    ],
+    "passes": [
+        {
+            "name": "raytracer",
+            "intarget": "minecraft:main",
+            "outtarget": "final",
+            "auxtargets": [
+                {
+                    "name": "AtlasSampler",
+                    "id": "atlas",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": false
+                },
+                {
+                    "name": "IORSampler",
+                    "id": "ior",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": false
+                }
+            ]
+        },
+        {
+            "name": "blit",
+            "intarget": "final",
+            "outtarget": "minecraft:main"
+        }
+    ]
+}
