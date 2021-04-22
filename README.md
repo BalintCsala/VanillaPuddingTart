@@ -23,6 +23,7 @@ Make sure you use the latest snapshots (21w15a+)!
     5. Look for the line
      
     ```{ "name": "ScreenSize", "type": "float", "count": 2, "values": [ 1920.0, 1017.0 ] }```
+    
     6. Carefully edit the last two numbers to the width and height you got at step `ii.`. Make sure to use dots and not commas for the decimal point!
  4. Start the game and enter into a world (a superflat with the void preset is a good starting point, as most normal worlds don't work)
  5. Go into video settings and set Graphics to _Fabulous!_
