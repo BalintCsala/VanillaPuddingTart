@@ -5,7 +5,7 @@ const float FPRECISION = 4000000.0;
 const float NUMCONTROLS = 200;
 const float THRESH = 0.5;
 const float PROJNEAR = 0.05;
-const float AREA_SIZE = 80;
+const float AREA_SIZE = 60;
 
 int imod(int val, int m) {
     return val - val / m * m;

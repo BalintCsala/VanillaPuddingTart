@@ -81,7 +81,7 @@ void main() {
 	} else {
 		// Cull the blocks that are at least 30 blocks away in any direction.
 
-		if (any(greaterThan(abs(worldPos), vec3(30)))) {
+		if (any(greaterThan(abs(worldPos), vec3(AREA_SIZE / 2 - 1)))) {
 			gl_Position = vec4(999, 999, 0, 1);
 			return;
 		}

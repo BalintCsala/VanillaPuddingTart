@@ -2,11 +2,11 @@
 
 const float PI = 3.141592654;
 const float EPSILON = 0.001;
-const int MAX_STEPS = 80;
+const int MAX_STEPS = 100;
 const int MAX_BOUNCES = 40;
 const vec3 SKY_COLOR = vec3(0.4, 0.6, 1);
 const vec3 SUN = normalize(vec3(1, 3, 2));
-const float AREA_SIZE = 80;
+const float AREA_SIZE = 60;
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D AtlasSampler;
@@ -60,7 +60,7 @@ vec2 blockToPixel(vec3 position) {
 }
 
 vec4 getBlock(vec3 position) {
-    if (any(greaterThan(abs(position), vec3(30)))) {
+    if (any(greaterThan(abs(position), vec3(AREA_SIZE / 2 - 1)))) {
         return vec4(1);
     }
     vec2 texCoord = pixelToTexCoord(blockToPixel(position), OutSize);
