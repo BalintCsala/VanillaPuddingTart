@@ -9,7 +9,7 @@ Disclaimer: This shader is WIP. It is not complete in any shape or form, it stil
 
 ## How to install
 
-Make sure you use the latest snapshots (21w15a+)!
+Make sure you use the latest snapshots (21w16a+)!
 
  1. Press the green `⤓ Code` button and select "Download ZIP"
  2. Extract the content of the ZIP file to your resource pack folder
