@@ -14,7 +14,6 @@ uniform sampler2D Sampler2;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform vec3 ChunkOffset;
-uniform vec2 ScreenSize;
 
 out vec2 texCoord0;
 out vec2 pixel;
@@ -79,16 +78,15 @@ void main() {
 		gl_Position = ScreenPositions[gl_VertexID];
 		glpos = gl_Position;
 	} else {
-		// Cull the blocks that are at least 30 blocks away in any direction.
+		// Cull the blocks that are at least (LAYER_SIZE / 2 - 1) blocks away in any direction.
 
-		if (any(greaterThan(abs(worldPos), vec3(AREA_SIZE / 2 - 1)))) {
+		if (any(greaterThan(abs(worldPos), vec3(LAYER_SIZE / 2 - 1)))) {
 			gl_Position = vec4(999, 999, 0, 1);
 			return;
 		}
 
 		// Place each face as a single pixel. If any of the faces are visible, the block will be shown.
-		// No way to get screensize I know of.
-		gl_Position = vec4(pixelToTexCoord(pixel + realTexCoord, ScreenSize) * 2 - 1, 0, 1);
+		gl_Position = vec4(pixelToTexCoord(pixel + realTexCoord) * 2 - 1, 0, 1);
 	}
 
 	texCoord0 = UV0;

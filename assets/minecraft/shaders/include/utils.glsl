@@ -5,28 +5,34 @@ const float FPRECISION = 4000000.0;
 const float NUMCONTROLS = 200;
 const float THRESH = 0.5;
 const float PROJNEAR = 0.05;
-const float AREA_SIZE = 60;
+
+// I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
+// This should just barely fit 8, 88 deep layers (8 * 88 + 1 control line = 705)
+// I want to keep the stored layers square, therefore I only use 88 * 11 = 968 pixels horizontally
+const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
+const float LAYER_SIZE = 88;
+const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
 
 int imod(int val, int m) {
     return val - val / m * m;
 }
 
-vec2 pixelToTexCoord(vec2 pixel, vec2 screenSize) {
-    return pixel / (screenSize - 1);
+vec2 pixelToTexCoord(vec2 pixel) {
+    return pixel / (VOXEL_STORAGE_RESOLUTION - 1);
 }
 
 vec2 blockToPixel(vec3 position) {
     // The block data is split into layers. Each layer is 60x60 blocks and represents a single y height.
     // Therefore the position inside a layer is just the position of the block on the xz plane relative to the player.
-    vec2 inLayerPos = position.xz + AREA_SIZE / 2;
+    vec2 inLayerPos = position.xz + LAYER_SIZE / 2;
     // There are 60 layers, we store them in an 8x8 area.
-    vec2 layerStart = vec2(mod(position.y + AREA_SIZE / 2, 8), floor((position.y + AREA_SIZE / 2) / 8)) * AREA_SIZE;
+    vec2 layerStart = vec2(mod(position.y + LAYER_SIZE / 2, STORAGE_DIMENSIONS.y), floor((position.y + LAYER_SIZE / 2) / STORAGE_DIMENSIONS.y)) * LAYER_SIZE;
     // We offset it by 1 pixel in the y direction, because we store the matrices there
     return layerStart + inLayerPos + vec2(0, 1);
 }
 
-vec2 blockToTexCoord(vec3 position, vec2 screenSize) {
-    return pixelToTexCoord(blockToPixel(position), screenSize);
+vec2 blockToTexCoord(vec3 position) {
+    return pixelToTexCoord(blockToPixel(position));
 }
 
 vec3 encodeInt(int i) {
