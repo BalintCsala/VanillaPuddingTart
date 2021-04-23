@@ -116,6 +116,8 @@ vec3 facingDirection;
 
 Hit trace(Ray ray, int maxSteps, bool reflected) {
     float totalT = 0;
+    vec3 signedDirection = sign(ray.direction);
+    ivec3 iSignedDirection = ivec3(round(signedDirection));
     // Cap the amount of steps we take to make sure no ifinite loop happens.
     for (int i = 0; i < maxSteps; i++) {
         // The world is divided into blocks, so we can use a simplified tracing algorithm where we always go to the
@@ -125,59 +127,56 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         // components of the ray's direction, but I'll keep it simple here. Faster algorithms also exist.
 
         // "Easter egg"
-        if (reflected && ray.currentBlock.x >= -2 && ray.currentBlock.x <= 0 && ray.currentBlock.z >= -2 && ray.currentBlock.z <= 0 && ray.currentBlock.y <= -1 && ray.currentBlock.y >= -3) {
-            vec3 thingActualPos = -chunkOffset;
+        if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y +2) <= 1 ) {
             vec3 rayActualPos = ray.currentBlock + ray.blockPosition;
-            float t = intersectPlane(rayActualPos, ray.direction, thingActualPos, vec3(facingDirection.x, 0, facingDirection.z));
+            float t = intersectPlane(rayActualPos, ray.direction, -chunkOffset, vec3(facingDirection.x, 0, facingDirection.z));
             vec3 thingHitPos = rayActualPos + ray.direction * t;
             // Let's check whether the ray will intersect a cylinder
-            if (t > 0 && abs(thingActualPos.y - 0.70 - thingHitPos.y) < 1 && length(thingHitPos.xz - thingActualPos.xz) < 0.5) {
+            if (t > 0 && abs(chunkOffset.y + 0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz + chunkOffset.xz) < 0.5) {
                 Hit hit;
                 hit.t = 999;
                 hit.texCoord = vec2(
-                    (length(thingHitPos.xz - thingActualPos.xz) + 0.56) * 1.8 / 2,
-                    0.10 - (thingHitPos.y - thingActualPos.y) / 2
+                    (length(thingHitPos.xz + chunkOffset.xz) + 0.56) * 1.8 / 2,
+                    0.10 - (thingHitPos.y + chunkOffset.y) / 2
                 );
 
                 vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
-                if (dot(thingColor, thingColor) > 0) {
+                if (thingColor.x + thingColor.y + thingColor.z > 0) {
                     return hit;
                 }
             }
         }
 
+        vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
         // The steps in each direction:
-        vec3 normalizedDirection = ray.direction / abs(ray.direction);
-        ivec3 iNormalizedDirection = ivec3(int(round(normalizedDirection.x)), int(round(normalizedDirection.y)), int(round(normalizedDirection.z)));
-        vec3 steps = ((normalizedDirection + 1) / 2 - ray.blockPosition) / ray.direction;
         float t = min(min(steps.x, steps.y), steps.z);
 
         ray.blockPosition += t * ray.direction;
         totalT += t;
-
+        
         // We select the smallest of the steps and update the current block and block position.
         vec3 normal;
         vec2 texCoord;
-        if (abs(t - steps.x) < EPSILON) {
-            normal = vec3(-normalizedDirection.x, 0, 0);
-            ray.currentBlock.x += iNormalizedDirection.x;
-            ray.blockPosition.x = (1 - iNormalizedDirection.x) / 2;
+        if (steps.x - t < EPSILON) {
+            normal = vec3(-signedDirection.x, 0, 0);
+            ray.currentBlock.x += iSignedDirection.x;
+            ray.blockPosition.x = (1 - iSignedDirection.x) / 2;
             texCoord = ray.blockPosition.zy;
-        } else if (abs(t - steps.y) < EPSILON) {
-            normal = vec3(0, -normalizedDirection.y, 0);
-            ray.currentBlock.y += iNormalizedDirection.y;
-            ray.blockPosition.y = (1 - iNormalizedDirection.y) / 2;
+        } else if (steps.y - t < EPSILON) {
+            normal = vec3(0, -signedDirection.y, 0);
+            ray.currentBlock.y += iSignedDirection.y;
+            ray.blockPosition.y = (1 - iSignedDirection.y) / 2;
             texCoord = ray.blockPosition.xz;
         } else {
-            normal = vec3(0, 0, -normalizedDirection.z);
-            ray.currentBlock.z += iNormalizedDirection.z;
-            ray.blockPosition.z = (1 - iNormalizedDirection.z) / 2;
+            normal = vec3(0, 0, -signedDirection.z);
+            ray.currentBlock.z += iSignedDirection.z;
+            ray.blockPosition.z = (1 - iSignedDirection.z) / 2;
             texCoord = ray.blockPosition.xy;
         }
         // We can now query if there's a block at the current position.
         vec4 voxelData = getBlock(ray.currentBlock);
         // If it's a block (it's not white), we stop and draw to the screen.
-        if (length(voxelData - 1) > EPSILON) {
+        if (3.0 - voxelData.x - voxelData.y - voxelData.z > EPSILON) {
             return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, voxelData, texCoord);
         }
     }
