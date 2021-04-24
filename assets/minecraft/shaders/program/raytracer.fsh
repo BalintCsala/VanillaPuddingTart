@@ -181,7 +181,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
 
         ray.blockPosition += t * ray.direction;
         totalT += t;
-
+        
         // We select the smallest of the steps and update the current block and block position.
         vec3 normal;
         vec2 texCoord;
