@@ -282,24 +282,13 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce) {
     if (hit.t < 0) {
         return hit.color;
     } else {
-        // Since we know that every normal is pointing in 1 of 6 directions, we can make assumptions on where sunlight
-        // could be coming from. Since the ray can be reflected along each components, there are 8 total possible directions.
-        vec3 possibleDirections[] = vec3[](
-            sunDir * vec3( 1,  1,  1),
-            sunDir * vec3( 1,  1, -1),
-            sunDir * vec3( 1, -1,  1),
-            sunDir * vec3( 1, -1, -1),
-            sunDir * vec3(-1,  1,  1),
-            sunDir * vec3(-1,  1, -1),
-            sunDir * vec3(-1, -1,  1),
-            sunDir * vec3(-1, -1, -1)
-        );
+        // Multiple light directions are way too slow now, so let's just keep it at one.
         vec3 diffuse = vec3(0);
-        for (int i = 0; i < 8; i++) {
-            if (dot(possibleDirections[i], hit.normal) <= 0) continue;
-            BounceHit shadowHit = traceBounces(Ray(hit.block, hit.blockPosition, possibleDirections[i]), maxBounces, maxStepPerBounce, vec3(1));
+        float contribution = dot(hit.normal, sunDir);
+        if (contribution > 0) {
+            BounceHit shadowHit = traceBounces(Ray(hit.block, hit.blockPosition, sunDir), maxBounces, maxStepPerBounce, vec3(1));
             if (shadowHit.t < 0 && dot(shadowHit.finalDirection, sunDir) > 1 - EPSILON) {
-                diffuse += max(dot(hit.normal, possibleDirections[i]), 0) * shadowHit.color;
+                diffuse += contribution * shadowHit.color;
             }
         }
         diffuse = diffuse * 0.6 + 0.4;
