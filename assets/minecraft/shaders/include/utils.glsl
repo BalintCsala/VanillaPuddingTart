@@ -62,7 +62,7 @@ float decodeFloat(vec3 ivec) {
 
 // returns control pixel index or -1 if not control
 int inControl(vec2 screenCoord, float screenWidth) {
-    if (screenCoord.y < 1.0) {
+    if (screenCoord.y < 1) {
         float index = floor(screenWidth / 2.0) + THRESH / 2.0;
         index = (screenCoord.x - index) / 2.0;
         if (fract(index) < THRESH && index < NUMCONTROLS && index >= 0) {
