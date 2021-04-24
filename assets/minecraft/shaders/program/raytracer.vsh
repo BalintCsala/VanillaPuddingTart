@@ -20,7 +20,6 @@ out mat4 modelViewMat;
 out vec3 chunkOffset;
 out vec3 rayDir;
 out float fov;
-out mat3 cameraMatrix;
 
 int decodeInt(vec3 ivec) {
     ivec *= 255.0;
@@ -63,31 +62,17 @@ void main() {
     far = projMat[3][2] * near / (projMat[3][2] + 2.0 * near);
 
     chunkOffset = vec3(
-        decodeFloat(texture(DiffuseSampler, start + 100 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 101 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 102 * inc).xyz)
+            decodeFloat(texture(DiffuseSampler, start + 100 * inc).xyz),
+            decodeFloat(texture(DiffuseSampler, start + 101 * inc).xyz),
+            decodeFloat(texture(DiffuseSampler, start + 102 * inc).xyz)
     );
 
-    vec3 up = normalize(vec3(
-        decodeFloat(texture(DiffuseSampler, start + 103 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 104 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 105 * inc).xyz)
-    ));
+    fov = decodeFloat(texture(DiffuseSampler, start + 109 * inc).xyz);
 
-    vec3 forward = normalize(vec3(
-        decodeFloat(texture(DiffuseSampler, start + 106 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 107 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 108 * inc).xyz)
-    ));
-
-    vec3 right = normalize(cross(up, forward));
-
-    cameraMatrix = mat3(right, up, forward);
-
-    fov = decodeFloat(texture(DiffuseSampler, start + 109 * inc).xyz) * 3.141592654;
-
-//    sunDir = normalize((inverse(ModeViewMat) * vec4(decodeFloat(texture(DiffuseSampler, start).xyz),
-//            decodeFloat(texture(DiffuseSampler, start + inc).xyz),
-//            decodeFloat(texture(DiffuseSampler, start + 2.0 * inc).xyz),
-//            1.0)).xyz);
+    /*sunDir = normalize((inverse(modelViewMat) * vec4(
+            decodeFloat(texture(DiffuseSampler, start).xyz),
+            decodeFloat(texture(DiffuseSampler, start + inc).xyz),
+            decodeFloat(texture(DiffuseSampler, start + 2.0 * inc).xyz),
+            1)).xyz);*/
+    sunDir = normalize(vec3(1, 3, 2));
 }

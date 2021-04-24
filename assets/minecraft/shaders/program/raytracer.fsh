@@ -5,7 +5,6 @@ const float EPSILON = 0.001;
 const int MAX_STEPS = 100;
 const int MAX_BOUNCES = 40;
 const vec3 SKY_COLOR = vec3(0.4, 0.6, 1);
-const vec3 SUN = normalize(vec3(1, 3, 2));
 // I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
 // This should just barely fit 8, 88 deep layers (8 * 88 + 1 control line = 705)
 // I want to keep the stored layers square, therefore I only use 88 * 11 = 968 pixels horizontally
@@ -26,7 +25,6 @@ in float near;
 in float far;
 in mat4 projMat;
 in mat4 modelViewMat;
-in mat3 cameraMatrix;
 in vec3 chunkOffset;
 in float fov;
 
@@ -41,13 +39,29 @@ struct Ray {
     vec3 direction;
 };
 
+struct BlockData {
+    int type;
+    vec2 blockTexCoord;
+    vec3 albedo;
+    vec3 F0;
+};
+
 struct Hit {
     float t;
     vec3 block;
     vec3 blockPosition;
     vec3 normal;
-    vec4 voxelData;
+    BlockData blockData;
     vec2 texCoord;
+};
+
+struct BounceHit {
+    float t;
+    vec3 block;
+    vec3 blockPosition;
+    vec3 color;
+    vec3 normal;
+    vec3 finalDirection;
 };
 
 // No moj_import here
@@ -66,18 +80,29 @@ vec2 blockToPixel(vec3 position) {
     return layerStart + inLayerPos + vec2(0.5, 1.5);
 }
 
-vec4 getBlock(vec3 position) {
-    if (any(greaterThan(abs(position), vec3(LAYER_SIZE / 2 - 1)))) {
-        return vec4(1);
-    }
-    vec2 texCoord = pixelToTexCoord(blockToPixel(position));
-    return texture(DiffuseSampler, texCoord);
-}
-
 int decodeInt(vec3 ivec) {
     ivec *= 255.0;
     int s = ivec.b >= 128.0 ? -1 : 1;
     return s * (int(ivec.r) + int(ivec.g) * 256 + (int(ivec.b) - 64 + s * 64) * 256 * 256);
+}
+
+BlockData getBlock(vec3 position, vec2 texCoord) {
+    BlockData blockData;
+    vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(position))).rgb;
+    if (any(greaterThan(abs(position), vec3(LAYER_SIZE / 2 - 1)))) {
+        blockData.type = -99;
+        return blockData;
+    } else if (length(rawData - 1) < EPSILON) {
+        blockData.type = -1;
+        return blockData;
+    }
+    int data = decodeInt(rawData);
+
+    blockData.type = 1;
+    blockData.blockTexCoord = (vec2(data >> 6, data & 63) + texCoord) / 64;
+    blockData.albedo = texture(AtlasSampler, blockData.blockTexCoord).rgb;
+    blockData.F0 = texture(IORSampler, blockData.blockTexCoord).rgb;
+    return blockData;
 }
 
 vec2 getControl(int index, vec2 screenSize) {
@@ -114,6 +139,10 @@ float intersectPlane(vec3 origin, vec3 direction, vec3 point, vec3 normal) {
 
 vec3 facingDirection;
 
+vec3 fresnel(vec3 F0, float cosTheta) {
+    return F0 + (1 - F0) * pow(max(1 - cosTheta, 0), 5);
+}
+
 Hit trace(Ray ray, int maxSteps, bool reflected) {
     float totalT = 0;
     // Cap the amount of steps we take to make sure no ifinite loop happens.
@@ -124,13 +153,12 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         // we need to take to reach a wall in that direction. This could be faster by precomputing 1 divided by the
         // components of the ray's direction, but I'll keep it simple here. Faster algorithms also exist.
 
-        // "Easter egg"
         if (reflected && ray.currentBlock.x >= -2 && ray.currentBlock.x <= 0 && ray.currentBlock.z >= -2 && ray.currentBlock.z <= 0 && ray.currentBlock.y <= -1 && ray.currentBlock.y >= -3) {
             vec3 thingActualPos = -chunkOffset;
             vec3 rayActualPos = ray.currentBlock + ray.blockPosition;
             float t = intersectPlane(rayActualPos, ray.direction, thingActualPos, vec3(facingDirection.x, 0, facingDirection.z));
             vec3 thingHitPos = rayActualPos + ray.direction * t;
-            // Let's check whether the ray will intersect a cylinder
+
             if (t > 0 && abs(thingActualPos.y - 0.70 - thingHitPos.y) < 1 && length(thingHitPos.xz - thingActualPos.xz) < 0.5) {
                 Hit hit;
                 hit.t = 999;
@@ -175,10 +203,16 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             texCoord = ray.blockPosition.xy;
         }
         // We can now query if there's a block at the current position.
-        vec4 voxelData = getBlock(ray.currentBlock);
-        // If it's a block (it's not white), we stop and draw to the screen.
-        if (length(voxelData - 1) > EPSILON) {
-            return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, voxelData, texCoord);
+        BlockData blockData = getBlock(ray.currentBlock, texCoord);
+
+        if (blockData.type < -90) {
+            // We're outside of the known world, there will be dragons. Let's stop
+            break;
+        }
+
+        // If it's a block (type is non negative), we stop and draw to the screen.
+        if (blockData.type > 0) {
+            return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         }
     }
     Hit hit;
@@ -186,43 +220,39 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
     return hit;
 }
 
-vec3 fresnel(vec3 F0, float cosTheta) {
-    return F0 + (1 - F0) * pow(max(1 - cosTheta, 0), 5);
-}
-
-void main() {
-    // Set the pixel to black in case we don'steps hit anything.
-    fragColor = vec4(SKY_COLOR, 1);
-
-    // Define the ray we need to trace. The origin is always 0, since the blockdata is relative to the player.
-    facingDirection = vec3(0, 0, -1) * cameraMatrix;
-    Ray ray = Ray(
-        vec3(-1, -1, -1),
-        1 - chunkOffset,
-        normalize(vec3((texCoord * 2 - 1) * OutSize / OutSize.y, tan(2 * fov)) * cameraMatrix)
-    );
+BounceHit traceBounces(Ray ray, int maxBounces, int maxStepPerBounce, vec3 skyColor) {
+    vec3 weight = vec3(1);
+    BounceHit res;
+    res.color = vec3(0);
 
     Hit hit = trace(ray, MAX_STEPS, false);
-    vec3 weight = vec3(1);
-    for (int i = 0; i < MAX_BOUNCES; i++) {
+    for (int i = 0; i < maxBounces; i++) {
         if (hit.t > 900) {
-            fragColor.rgb = texture(SteveSampler, hit.texCoord).rgb * weight;
-            break;
+            res.color += texture(SteveSampler, hit.texCoord).rgb * weight;
+            res.finalDirection = ray.direction;
+            res.t = hit.t;
+            return res;
         } else if (hit.t < 0) {
-            fragColor.rgb = SKY_COLOR * weight;
-            break;
+            res.color += skyColor * weight;
+            res.finalDirection = ray.direction;
+            res.t = hit.t;
+            return res;
         }
-        int data = decodeInt(hit.voxelData.rgb);
 
-        vec2 texCoord = (vec2(data >> 6, data & 63) + hit.texCoord) / 64;
-        vec3 F0 = texture(IORSampler, texCoord).rgb;
+        vec3 F0 = hit.blockData.F0;
         // Probably should be replaced by metallicity
         if (dot(F0, F0) > 0) {
             // Metallic
-            if (i == MAX_BOUNCES - 1) {
+            if (i == maxBounces - 1) {
                 // If we reached the end, just draw the reflectance factor
                 // Not that elegant, but works
-                fragColor.rgb = F0 * weight;
+                res.color += F0 * weight;
+                res.finalDirection = ray.direction;
+                res.t = hit.t;
+                res.block = hit.block;
+                res.blockPosition = hit.blockPosition;
+                res.normal = hit.normal;
+                return res;
             } else {
                 // Otherwise bounce the ray back
                 weight *= fresnel(F0, dot(-ray.direction, hit.normal));
@@ -231,17 +261,63 @@ void main() {
             }
         } else {
             // Diffuse
-            // Self shadow with the minecraft numbers
-            float diffuse = max(dot(hit.normal, SUN), 0) * 0.6 + 0.4;
-            // Shadow ray
-            Hit shadowHit = trace(Ray(hit.block, hit.blockPosition, SUN), MAX_STEPS, true);
-            if (shadowHit.t > 0) {
-                diffuse = 0.4;
-            }
-            fragColor = vec4(texture(AtlasSampler, texCoord).rgb * weight * diffuse, 1);
-            break;
+            res.color += hit.blockData.albedo * weight;
+            res.finalDirection = ray.direction;
+            res.t = hit.t;
+            res.block = hit.block;
+            res.blockPosition = hit.blockPosition;
+            res.normal = hit.normal;
+            return res;
         }
     }
+    res.finalDirection = ray.direction;
+    res.t = hit.t;
+    res.block = hit.block;
+    res.blockPosition = hit.blockPosition;
+    res.normal = hit.normal;
+    return res;
+}
 
-    //fragColor = mix(fragColor, texture(DiffuseSampler, texCoord), 0.5);
+vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce) {
+    BounceHit hit = traceBounces(ray, maxBounces, maxStepPerBounce, SKY_COLOR);
+    if (hit.t < 0) {
+        return hit.color;
+    } else {
+        // Since we know that every normal is pointing in 1 of 6 directions, we can make assumptions on where sunlight
+        // could be coming from. Since the ray can be reflected along each components, there are 8 total possible directions.
+        vec3 possibleDirections[] = vec3[](
+            sunDir * vec3( 1,  1,  1),
+            sunDir * vec3( 1,  1, -1),
+            sunDir * vec3( 1, -1,  1),
+            sunDir * vec3( 1, -1, -1),
+            sunDir * vec3(-1,  1,  1),
+            sunDir * vec3(-1,  1, -1),
+            sunDir * vec3(-1, -1,  1),
+            sunDir * vec3(-1, -1, -1)
+        );
+        vec3 diffuse = vec3(0);
+        for (int i = 0; i < 8; i++) {
+            if (dot(possibleDirections[i], hit.normal) <= 0) continue;
+            BounceHit shadowHit = traceBounces(Ray(hit.block, hit.blockPosition, possibleDirections[i]), maxBounces, maxStepPerBounce, vec3(1));
+            if (shadowHit.t < 0 && dot(shadowHit.finalDirection, sunDir) > 1 - EPSILON) {
+                diffuse += max(dot(hit.normal, possibleDirections[i]), 0) * shadowHit.color;
+            }
+        }
+        diffuse = diffuse * 0.6 + 0.4;
+
+        return diffuse * hit.color;
+    }
+}
+
+void main() {
+    // Set the pixel to black in case we don'steps hit anything.
+    // Define the ray we need to trace. The origin is always 0, since the blockdata is relative to the player.
+    facingDirection = vec3(0, 0, -1) * mat3(modelViewMat);
+    Ray ray = Ray(
+        vec3(-1, -1, -1),
+        1 - chunkOffset,
+        normalize(vec3((texCoord * 2 - 1) * OutSize / OutSize.y, tan(2 * fov)) * mat3(modelViewMat))
+    );
+
+    fragColor = vec4(traceScene(ray, MAX_BOUNCES, MAX_STEPS), 1);
 }
