@@ -95,7 +95,7 @@ vec2 blockToPixel(vec3 position) {
 
 int decodeInt(vec3 ivec) {
     ivec *= 255.0;
-    int s = ivec.b >= 128.0 ? -1 : 1;
+    int s = int(sign(127.9 - ivec.b));
     return s * (int(ivec.r) + int(ivec.g) * 256 + (int(ivec.b) - 64 + s * 64) * 256 * 256);
 }
 
@@ -105,7 +105,7 @@ BlockData getBlock(vec3 position, vec2 texCoord) {
     if (any(greaterThan(abs(position), vec3(LAYER_SIZE / 2 - 1)))) {
         blockData.type = -99;
         return blockData;
-    } else if (length(rawData - 1) < EPSILON) {
+    } else if (3 - rawData.x - rawData.y - rawData.z < EPSILON) {
         blockData.type = -1;
         return blockData;
     }
@@ -146,8 +146,8 @@ float intersectCircle(vec2 origin, vec2 direction, vec2 center, float radius) {
     }
 }
 
-float intersectPlane(vec3 origin, vec3 direction, vec3 point, vec3 normal) {
-    return dot(point - origin, normal) / dot(direction, normal);
+float intersectPlane(vec3 origin, vec3 direction, vec3 normal) {
+    return dot(-origin, normal) / dot(direction, normal);
 }
 
 vec3 fresnel(vec3 F0, float cosTheta) {
@@ -157,7 +157,6 @@ vec3 fresnel(vec3 F0, float cosTheta) {
 Hit trace(Ray ray, int maxSteps, bool reflected) {
     float totalT = 0;
     vec3 signedDirection = sign(ray.direction);
-    ivec3 iSignedDirection = ivec3(round(signedDirection));
     // Cap the amount of steps we take to make sure no ifinite loop happens.
     for (int i = 0; i < maxSteps; i++) {
         // The world is divided into blocks, so we can use a simplified tracing algorithm where we always go to the
@@ -167,16 +166,16 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         // components of the ray's direction, but I'll keep it simple here. Faster algorithms also exist.
 
         if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y +2) <= 1 ) {
-            vec3 rayActualPos = ray.currentBlock + ray.blockPosition;
-            float t = intersectPlane(rayActualPos, ray.direction, -chunkOffset, vec3(facingDirection.x, 0, facingDirection.z));
+            vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
+            float t = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, 0, facingDirection.z));
             vec3 thingHitPos = rayActualPos + ray.direction * t;
             // Let's check whether the ray will intersect a cylinder
-            if (t > 0 && abs(chunkOffset.y + 0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz + chunkOffset.xz) < 0.5) {
+            if (t > 0 && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
                 Hit hit;
                 hit.t = 999;
                 hit.texCoord = vec2(
-                (length(thingHitPos.xz + chunkOffset.xz) + 0.56) * 1.8 / 2,
-                0.10 - (thingHitPos.y + chunkOffset.y) / 2
+                    (length(thingHitPos.xz) + 0.56) * 1.8 / 2,
+                    0.10 - (thingHitPos.y) / 2
                 );
 
                 vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
@@ -198,18 +197,18 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         vec2 texCoord;
         if (steps.x - t < EPSILON) {
             normal = vec3(-signedDirection.x, 0, 0);
-            ray.currentBlock.x += iSignedDirection.x;
-            ray.blockPosition.x = (1 - iSignedDirection.x) / 2;
+            ray.currentBlock.x += signedDirection.x;
+            ray.blockPosition.x = (1 - signedDirection.x) / 2;
             texCoord = ray.blockPosition.zy;
         } else if (steps.y - t < EPSILON) {
             normal = vec3(0, -signedDirection.y, 0);
-            ray.currentBlock.y += iSignedDirection.y;
-            ray.blockPosition.y = (1 - iSignedDirection.y) / 2;
+            ray.currentBlock.y += signedDirection.y;
+            ray.blockPosition.y = (1 - signedDirection.y) / 2;
             texCoord = ray.blockPosition.xz;
         } else {
             normal = vec3(0, 0, -signedDirection.z);
-            ray.currentBlock.z += iSignedDirection.z;
-            ray.blockPosition.z = (1 - iSignedDirection.z) / 2;
+            ray.currentBlock.z += signedDirection.z;
+            ray.blockPosition.z = (1 - signedDirection.z) / 2;
             texCoord = ray.blockPosition.xy;
         }
         // We can now query if there's a block at the current position.
