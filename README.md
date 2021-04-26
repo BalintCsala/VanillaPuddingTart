@@ -1,7 +1,7 @@
 # Path tracing 1.17 shader
 
 Disclaimer: This shader is WIP. It is not complete in any shape or form, it still has the following very obvious problems:
- - No support for non-full blocks~~, translucent blocks~~ and blocks with different textures on some sides
+ - No support for non-full blocks ~~, translucent blocks~~ and blocks with different textures on some sides
  - ~~Dawn and night just straight up breaks it, only play at noon~~ (Fixed)
  - Some camera glitches
  - No view bobbing
