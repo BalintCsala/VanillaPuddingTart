@@ -9,6 +9,17 @@
     "attributes": [ "Position" ],
     "samplers": [
         { "name": "DiffuseSampler" },
+        { "name": "DiffuseDepthSampler" },
+        { "name": "TranslucentSampler" },
+        { "name": "TranslucentDepthSampler" },
+        { "name": "ItemEntitySampler" },
+        { "name": "ItemEntityDepthSampler" },
+        { "name": "ParticlesSampler" },
+        { "name": "ParticlesDepthSampler" },
+        { "name": "CloudsSampler" },
+        { "name": "CloudsDepthSampler" },
+        { "name": "WeatherSampler" },
+        { "name": "WeatherDepthSampler" },
         { "name": "AtlasSampler" },
         { "name": "IORSampler" },
         { "name": "SteveSampler" }

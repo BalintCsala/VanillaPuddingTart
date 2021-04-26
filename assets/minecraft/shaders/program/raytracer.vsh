@@ -13,13 +13,14 @@ uniform sampler2D DiffuseSampler;
 out vec2 texCoord;
 out vec2 oneTexel;
 out vec3 sunDir;
-out float near;
-out float far;
 out mat4 projMat;
 out mat4 modelViewMat;
+out mat4 projInv;
 out vec3 chunkOffset;
 out vec3 rayDir;
-out float fov;
+out vec3 facingDirection;
+out float near;
+out float far;
 
 int decodeInt(vec3 ivec) {
     ivec *= 255.0;
@@ -36,7 +37,7 @@ vec2 getControl(int index, vec2 screenSize) {
 }
 
 void main() {
-    vec4 outPos = ProjMat * vec4(Position.xy, 0.0, 1.0);
+    vec4 outPos = ProjMat * vec4(Position.xy, 0, 1.0);
     gl_Position = vec4(outPos.xy, 0.2, 1.0);
     texCoord = Position.xy / OutSize;
     oneTexel = 1.0 / OutSize;
@@ -67,7 +68,7 @@ void main() {
             decodeFloat(texture(DiffuseSampler, start + 102 * inc).xyz)
     );
 
-    fov = decodeFloat(texture(DiffuseSampler, start + 109 * inc).xyz);
+    float fov = atan(1 / projMat[1][1]);
 
     /*sunDir = normalize((inverse(modelViewMat) * vec4(
             decodeFloat(texture(DiffuseSampler, start).xyz),
@@ -75,4 +76,8 @@ void main() {
             decodeFloat(texture(DiffuseSampler, start + 2.0 * inc).xyz),
             1)).xyz);*/
     sunDir = normalize(vec3(1, 3, 2));
+
+    projInv = inverse(projMat * modelViewMat);
+    rayDir = (projInv * vec4(outPos.xy * (far - near), far + near, far - near)).xyz;
+    facingDirection = (vec4(0, 0, -1, 0) * modelViewMat).xyz;
 }

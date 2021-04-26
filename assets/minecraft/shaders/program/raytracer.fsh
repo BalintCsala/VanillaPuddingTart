@@ -13,6 +13,17 @@ const float LAYER_SIZE = 88;
 const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
 
 uniform sampler2D DiffuseSampler;
+uniform sampler2D DiffuseDepthSampler;
+uniform sampler2D TranslucentSampler;
+uniform sampler2D TranslucentDepthSampler;
+uniform sampler2D ItemEntitySampler;
+uniform sampler2D ItemEntityDepthSampler;
+uniform sampler2D ParticlesSampler;
+uniform sampler2D ParticlesDepthSampler;
+uniform sampler2D WeatherSampler;
+uniform sampler2D WeatherDepthSampler;
+uniform sampler2D CloudsSampler;
+uniform sampler2D CloudsDepthSampler;
 uniform sampler2D AtlasSampler;
 uniform sampler2D IORSampler;
 uniform sampler2D SteveSampler;
@@ -21,21 +32,23 @@ uniform vec2 OutSize;
 in vec2 texCoord;
 in vec2 oneTexel;
 in vec3 sunDir;
-in float near;
-in float far;
 in mat4 projMat;
 in mat4 modelViewMat;
+in mat4 projInv;
 in vec3 chunkOffset;
-in float fov;
+in vec3 rayDir;
+in vec3 facingDirection;
+in float near;
+in float far;
 
 out vec4 fragColor;
 
 struct Ray {
-    // Index of the block the ray is in.
+// Index of the block the ray is in.
     vec3 currentBlock;
-    // Position of the ray inside the block.
+// Position of the ray inside the block.
     vec3 blockPosition;
-    // The direction of the ray
+// The direction of the ray
     vec3 direction;
 };
 
@@ -137,8 +150,6 @@ float intersectPlane(vec3 origin, vec3 direction, vec3 point, vec3 normal) {
     return dot(point - origin, normal) / dot(direction, normal);
 }
 
-vec3 facingDirection;
-
 vec3 fresnel(vec3 F0, float cosTheta) {
     return F0 + (1 - F0) * pow(max(1 - cosTheta, 0), 5);
 }
@@ -164,8 +175,8 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
                 Hit hit;
                 hit.t = 999;
                 hit.texCoord = vec2(
-                    (length(thingHitPos.xz + chunkOffset.xz) + 0.56) * 1.8 / 2,
-                    0.10 - (thingHitPos.y + chunkOffset.y) / 2
+                (length(thingHitPos.xz + chunkOffset.xz) + 0.56) * 1.8 / 2,
+                0.10 - (thingHitPos.y + chunkOffset.y) / 2
                 );
 
                 vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
@@ -181,7 +192,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
 
         ray.blockPosition += t * ray.direction;
         totalT += t;
-        
+
         // We select the smallest of the steps and update the current block and block position.
         vec3 normal;
         vec2 texCoord;
@@ -219,12 +230,13 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
     return hit;
 }
 
-BounceHit traceBounces(Ray ray, int maxBounces, int maxStepPerBounce, vec3 skyColor) {
+BounceHit traceBounces(Ray ray, int maxBounces, int maxStepPerBounce, vec3 skyColor, out float depth) {
     vec3 weight = vec3(1);
     BounceHit res;
     res.color = vec3(0);
 
-    Hit hit = trace(ray, MAX_STEPS, false);
+    Hit hit = trace(ray, maxStepPerBounce, false);
+    depth = hit.t;
     for (int i = 0; i < maxBounces; i++) {
         if (hit.t > 900) {
             res.color += texture(SteveSampler, hit.texCoord).rgb * weight;
@@ -256,7 +268,7 @@ BounceHit traceBounces(Ray ray, int maxBounces, int maxStepPerBounce, vec3 skyCo
                 // Otherwise bounce the ray back
                 weight *= fresnel(F0, dot(-ray.direction, hit.normal));
                 ray = Ray(hit.block, hit.blockPosition, reflect(ray.direction, hit.normal));
-                hit = trace(ray, MAX_STEPS, true);
+                hit = trace(ray, maxStepPerBounce, true);
             }
         } else {
             // Diffuse
@@ -277,8 +289,8 @@ BounceHit traceBounces(Ray ray, int maxBounces, int maxStepPerBounce, vec3 skyCo
     return res;
 }
 
-vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce) {
-    BounceHit hit = traceBounces(ray, maxBounces, maxStepPerBounce, SKY_COLOR);
+vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) {
+    BounceHit hit = traceBounces(ray, maxBounces, maxStepPerBounce, SKY_COLOR, depth);
     if (hit.t < 0) {
         return hit.color;
     } else {
@@ -286,7 +298,8 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce) {
         vec3 diffuse = vec3(0);
         float contribution = dot(hit.normal, sunDir);
         if (contribution > 0) {
-            BounceHit shadowHit = traceBounces(Ray(hit.block, hit.blockPosition, sunDir), maxBounces, maxStepPerBounce, vec3(1));
+            float _;
+            BounceHit shadowHit = traceBounces(Ray(hit.block, hit.blockPosition, sunDir), maxBounces, maxStepPerBounce, vec3(1), _);
             if (shadowHit.t < 0 && dot(shadowHit.finalDirection, sunDir) > 1 - EPSILON) {
                 diffuse += contribution * shadowHit.color;
             }
@@ -297,15 +310,69 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce) {
     }
 }
 
+const int NUM_LAYERS = 5;
+
+vec4 color_layers[NUM_LAYERS];
+float depth_layers[NUM_LAYERS];
+int active_layers = 0;
+
+void try_insert(vec4 color, float depth) {
+    if (color.a == 0.0) {
+        return;
+    }
+
+    color_layers[active_layers] = color;
+    depth_layers[active_layers] = depth;
+
+    int jj = active_layers++;
+    int ii = jj - 1;
+    while (jj > 0 && depth_layers[jj] > depth_layers[ii]) {
+        float depthTemp = depth_layers[ii];
+        depth_layers[ii] = depth_layers[jj];
+        depth_layers[jj] = depthTemp;
+
+        vec4 colorTemp = color_layers[ii];
+        color_layers[ii] = color_layers[jj];
+        color_layers[jj] = colorTemp;
+
+        jj = ii--;
+    }
+}
+
+vec3 blend( vec3 dst, vec4 src ) {
+    return (dst * (1.0 - src.a)) + src.rgb;
+}
+
+float linearizeDepth(float depth) {
+    return (2.0 * near * far) / (far + near - depth * (far - near));
+}
+
 void main() {
     // Set the pixel to black in case we don'steps hit anything.
     // Define the ray we need to trace. The origin is always 0, since the blockdata is relative to the player.
-    facingDirection = vec3(0, 0, -1) * mat3(modelViewMat);
-    Ray ray = Ray(
-        vec3(-1, -1, -1),
-        1 - chunkOffset,
-        normalize(vec3((texCoord * 2 - 1) * OutSize / OutSize.y, tan(2 * fov)) * mat3(modelViewMat))
-    );
+    Ray ray = Ray(vec3(-1), 1 - chunkOffset, normalize(rayDir));
 
-    fragColor = vec4(traceScene(ray, MAX_BOUNCES, MAX_STEPS), 1);
+    float depth;
+    vec3 color = traceScene(ray, MAX_BOUNCES, MAX_STEPS, depth);
+    if (depth < 0) depth = far;
+
+    vec4 position = projMat * modelViewMat * vec4(normalize(ray.direction) * depth, 1);
+    float diffuseDepth = linearizeDepth(sqrt(position.z / position.w));
+
+    color_layers[0] = vec4(color, 1);
+    depth_layers[0] = diffuseDepth + 0.0005;
+    active_layers = 1;
+
+    try_insert(texture(TranslucentSampler, texCoord), linearizeDepth(texture(TranslucentDepthSampler, texCoord).r));
+    try_insert(texture(ItemEntitySampler, texCoord), linearizeDepth(texture(ItemEntityDepthSampler, texCoord).r));
+    try_insert(texture(CloudsSampler, texCoord), linearizeDepth(texture(CloudsDepthSampler, texCoord).r));
+    try_insert(texture(ParticlesSampler, texCoord), linearizeDepth(texture(ParticlesDepthSampler, texCoord).r));
+
+    vec3 texelAccum = color_layers[0].rgb;
+    for ( int ii = 1; ii < active_layers; ++ii ) {
+        texelAccum = blend( texelAccum, color_layers[ii] );
+    }
+
+    //fragColor = vec4(depth, texture( TranslucentDepthSampler, texCoord ).r, 0, 1);//vec4( texelAccum.rgb, 1.0 );
+    fragColor = vec4( texelAccum.rgb, 1.0 );
 }

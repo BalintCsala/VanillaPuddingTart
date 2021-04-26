@@ -10,6 +10,7 @@ in vec4 glpos;
 out vec4 fragColor;
 
 void main() {
+    gl_FragDepth = 1;
     if (gl_PrimitiveID < 2) {
         // We'll treat the first face of every chunk differently
         int index = inControl(gl_FragCoord.xy, glpos);
