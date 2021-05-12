@@ -2,6 +2,8 @@
 
 #moj_import <utils.glsl>
 
+uniform sampler2D Sampler0;
+
 in vec2 texCoord0;
 in vec2 pixel;
 in vec3 chunkOffset;

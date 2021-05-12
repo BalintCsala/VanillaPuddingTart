@@ -4,7 +4,9 @@ const float PI = 3.141592654;
 const float EPSILON = 0.001;
 const int MAX_STEPS = 100;
 const int MAX_BOUNCES = 40;
-const vec3 SKY_COLOR = vec3(0.4, 0.6, 1);
+const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
+const vec3 SKY_COLOR = 0.5 * vec3(0.2, 0.35, 0.5);
+const float MAX_EMISSION_STRENGTH = 5;
 // I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
 // This should just barely fit 8, 88 deep layers vertically (8 * 88 + 1 control line = 705)
 // I want to keep the stored layers square, therefore I only use 88 * 11 = 968 pixels horizontally
@@ -27,7 +29,9 @@ uniform sampler2D CloudsDepthSampler;
 uniform sampler2D AtlasSampler;
 uniform sampler2D IORSampler;
 uniform sampler2D SteveSampler;
+uniform sampler2D EmissionSampler;
 uniform vec2 OutSize;
+uniform float Time;
 
 in vec2 texCoord;
 in vec2 oneTexel;
@@ -57,6 +61,7 @@ struct BlockData {
     vec2 blockTexCoord;
     vec3 albedo;
     vec3 F0;
+    vec4 emission;
 };
 
 struct Hit {
@@ -115,6 +120,7 @@ BlockData getBlock(vec3 position, vec2 texCoord) {
     blockData.blockTexCoord = (vec2(data >> 6, data & 63) + texCoord) / 64;
     blockData.albedo = texture(AtlasSampler, blockData.blockTexCoord).rgb;
     blockData.F0 = texture(IORSampler, blockData.blockTexCoord).rgb;
+    blockData.emission = texture(EmissionSampler, blockData.blockTexCoord);
     return blockData;
 }
 
@@ -148,6 +154,10 @@ float intersectCircle(vec2 origin, vec2 direction, vec2 center, float radius) {
 
 float intersectPlane(vec3 origin, vec3 direction, vec3 normal) {
     return dot(-origin, normal) / dot(direction, normal);
+}
+
+float rand(vec2 co){
+    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 vec3 fresnel(vec3 F0, float cosTheta) {
@@ -288,25 +298,49 @@ BounceHit traceBounces(Ray ray, int maxBounces, int maxStepPerBounce, vec3 skyCo
     return res;
 }
 
-vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) {
-    BounceHit hit = traceBounces(ray, maxBounces, maxStepPerBounce, SKY_COLOR, depth);
-    if (hit.t < 0) {
-        return hit.color;
-    } else {
-        // Multiple light directions are way too slow now, so let's just keep it at one.
-        vec3 diffuse = vec3(0);
-        float contribution = dot(hit.normal, sunDir);
-        if (contribution > 0) {
-            float _;
-            BounceHit shadowHit = traceBounces(Ray(hit.block, hit.blockPosition, sunDir), maxBounces, maxStepPerBounce, vec3(1), _);
-            if (shadowHit.t < 0 && dot(shadowHit.finalDirection, sunDir) > 1 - EPSILON) {
-                diffuse += contribution * shadowHit.color;
-            }
-        }
-        diffuse = diffuse * 0.6 + 0.4;
+vec3 randomDirection(vec2 coords, vec3 normal, float seed) {
+    float angle = 2 * PI * rand(coords + seed + Time);
+    float u = 2 * rand(coords + seed + PI + Time) - 1;
+    return normalize(normal + vec3(sqrt(1 - u * u) * vec2(cos(angle), sin(angle)), u));
+}
 
-        return diffuse * hit.color;
+vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) {
+    vec3 accumulated = vec3(0);
+    vec3 weight = vec3(1);
+
+    Hit hit;
+    float totalT = 0;
+    for (int step = 0; step < 3; step++) {
+        hit = trace(ray, step == 0 ? maxStepPerBounce : 16, false);
+        if (step == 0) {
+            depth = hit.t;
+        }
+        if (hit.t < EPSILON) {
+            accumulated += SKY_COLOR * weight;
+            break;
+        }
+        totalT += hit.t;
+
+        weight *= hit.blockData.albedo;
+
+        if (hit.blockData.emission.a > 0) {
+            accumulated += hit.blockData.emission.rgb * MAX_EMISSION_STRENGTH * weight;
+        }
+
+        // Sun contribution
+        Hit sunShadowHit = trace(Ray(hit.block, hit.blockPosition, sunDir), maxStepPerBounce, false);
+        accumulated += max(dot(sunDir, hit.normal), 0) * (sunShadowHit.t > EPSILON ? 0 : 1) * SUN_COLOR * weight;
+
+        // ""Ambient""/sky contribution
+        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(step) + 7.41);
+        Hit skyShadowHit = trace(Ray(hit.block, hit.blockPosition, skyRayDirection), maxStepPerBounce, false);
+        accumulated += SKY_COLOR * (skyShadowHit.t > EPSILON ? 0.4 : 1) * weight;
+
+        vec3 newDir = randomDirection(texCoord, hit.normal, float(step) * 754.54);
+        ray = Ray(hit.block, hit.blockPosition, newDir);
     }
+
+    return accumulated;
 }
 
 const int NUM_LAYERS = 5;
@@ -353,6 +387,7 @@ void main() {
 
     float depth;
     vec3 color = traceScene(ray, MAX_BOUNCES, MAX_STEPS, depth);
+
     if (depth < 0) depth = far;
 
     vec4 position = projMat * modelViewMat * vec4(normalize(ray.direction) * depth, 1);
@@ -369,9 +404,9 @@ void main() {
 
     vec3 texelAccum = color_layers[0].rgb;
     for ( int ii = 1; ii < active_layers; ++ii ) {
-        texelAccum = blend( texelAccum, color_layers[ii] );
+        texelAccum = blend(texelAccum, color_layers[ii]);
     }
 
     //fragColor = vec4(depth, texture( TranslucentDepthSampler, texCoord ).r, 0, 1);//vec4( texelAccum.rgb, 1.0 );
-    fragColor = vec4( texelAccum.rgb, 1.0 );
+    fragColor = vec4(texelAccum.rgb, 1.0);
 }

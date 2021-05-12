@@ -78,6 +78,13 @@
                     "width": 1,
                     "height": 1,
                     "bilinear": false
+                },
+                {
+                    "name": "EmissionSampler",
+                    "id": "emission",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": false
                 }
             ]
         },
