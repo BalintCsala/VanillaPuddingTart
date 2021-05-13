@@ -310,9 +310,9 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) 
 
     Hit hit;
     float totalT = 0;
-    for (int step = 0; step < 3; step++) {
-        hit = trace(ray, step == 0 ? maxStepPerBounce : 16, false);
-        if (step == 0) {
+    for (int steps = 0; steps < 3; steps++) {
+        hit = trace(ray, steps == 0 ? maxStepPerBounce : 16, false);
+        if (steps == 0) {
             depth = hit.t;
         }
         if (hit.t < EPSILON) {
@@ -332,11 +332,11 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) 
         accumulated += max(dot(sunDir, hit.normal), 0) * (sunShadowHit.t > EPSILON ? 0 : 1) * SUN_COLOR * weight;
 
         // ""Ambient""/sky contribution
-        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(step) + 7.41);
+        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(steps) + 7.41);
         Hit skyShadowHit = trace(Ray(hit.block, hit.blockPosition, skyRayDirection), maxStepPerBounce, false);
         accumulated += SKY_COLOR * (skyShadowHit.t > EPSILON ? 0.4 : 1) * weight;
 
-        vec3 newDir = randomDirection(texCoord, hit.normal, float(step) * 754.54);
+        vec3 newDir = randomDirection(texCoord, hit.normal, float(steps) * 754.54);
         ray = Ray(hit.block, hit.blockPosition, newDir);
     }
 
