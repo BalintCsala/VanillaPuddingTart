@@ -167,6 +167,7 @@ vec3 fresnel(vec3 F0, float cosTheta) {
 Hit trace(Ray ray, int maxSteps, bool reflected) {
     float totalT = 0;
     vec3 signedDirection = sign(ray.direction);
+    vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
     // Cap the amount of steps we take to make sure no ifinite loop happens.
     for (int i = 0; i < maxSteps; i++) {
         // The world is divided into blocks, so we can use a simplified tracing algorithm where we always go to the
@@ -183,10 +184,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             if (t > 0 && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
                 Hit hit;
                 hit.t = 999;
-                hit.texCoord = vec2(
-                    (length(thingHitPos.xz) + 0.56) * 1.8 / 2,
-                    0.10 - (thingHitPos.y) / 2
-                );
+                hit.texCoord = vec2((length(thingHitPos.xz) + 0.56) * 1.8 / 2, 0.10 - (thingHitPos.y) / 2);
 
                 vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
                 if (thingColor.x + thingColor.y + thingColor.z > 0) {
@@ -195,30 +193,33 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             }
         }
 
-        vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
         // The steps in each direction:
         float t = min(min(steps.x, steps.y), steps.z);
 
         ray.blockPosition += t * ray.direction;
+        steps -= t;
         totalT += t;
 
         // We select the smallest of the steps and update the current block and block position.
         vec3 normal;
         vec2 texCoord;
-        if (steps.x - t < EPSILON) {
+        if (steps.x < EPSILON) {
             normal = vec3(-signedDirection.x, 0, 0);
             ray.currentBlock.x += signedDirection.x;
             ray.blockPosition.x = (1 - signedDirection.x) / 2;
+            steps.x = signedDirection.x / ray.direction.x;
             texCoord = ray.blockPosition.zy;
-        } else if (steps.y - t < EPSILON) {
+        } else if (steps.y < EPSILON) {
             normal = vec3(0, -signedDirection.y, 0);
             ray.currentBlock.y += signedDirection.y;
             ray.blockPosition.y = (1 - signedDirection.y) / 2;
+            steps.y = signedDirection.y / ray.direction.y;
             texCoord = ray.blockPosition.xz;
         } else {
             normal = vec3(0, 0, -signedDirection.z);
             ray.currentBlock.z += signedDirection.z;
             ray.blockPosition.z = (1 - signedDirection.z) / 2;
+            steps.z = signedDirection.z / ray.direction.z;
             texCoord = ray.blockPosition.xy;
         }
         // We can now query if there's a block at the current position.
