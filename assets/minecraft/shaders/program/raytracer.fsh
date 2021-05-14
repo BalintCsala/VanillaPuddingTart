@@ -1,7 +1,7 @@
 #version 150
 
 const float PI = 3.141592654;
-const float EPSILON = 0.001;
+const float EPSILON = 0.00001;
 const int MAX_STEPS = 100;
 const int MAX_BOUNCES = 40;
 const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
@@ -30,6 +30,7 @@ uniform sampler2D AtlasSampler;
 uniform sampler2D IORSampler;
 uniform sampler2D SteveSampler;
 uniform sampler2D EmissionSampler;
+uniform sampler2D PreviousFrameSampler;
 uniform vec2 OutSize;
 uniform float Time;
 
@@ -156,8 +157,15 @@ float intersectPlane(vec3 origin, vec3 direction, vec3 normal) {
     return dot(-origin, normal) / dot(direction, normal);
 }
 
-float rand(vec2 co){
-    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+// By Inigo Quilez - https://www.shadertoy.com/view/XlXcW4
+const uint k = 1103515245U;
+
+vec3 hash(uvec3 x) {
+    x = ((x >> 8U) ^ x.yzx) * k;
+    x = ((x >> 8U) ^ x.yzx) * k;
+    x = ((x >> 8U) ^ x.yzx) * k;
+
+    return vec3(x) * (1.0 / float(0xffffffffU));
 }
 
 vec3 fresnel(vec3 F0, float cosTheta) {
@@ -194,6 +202,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
                 }
             }
         }
+
 
         vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
         // The steps in each direction:
@@ -299,8 +308,10 @@ BounceHit traceBounces(Ray ray, int maxBounces, int maxStepPerBounce, vec3 skyCo
 }
 
 vec3 randomDirection(vec2 coords, vec3 normal, float seed) {
-    float angle = 2 * PI * rand(coords + seed + Time);
-    float u = 2 * rand(coords + seed + PI + Time) - 1;
+    uvec3 p = uvec3(coords * 5000, (Time + seed) * 60);
+    vec3 v = hash(p);
+    float angle = 2 * PI * v.x;
+    float u = 2 * v.y - 1;
     return normalize(normal + vec3(sqrt(1 - u * u) * vec2(cos(angle), sin(angle)), u));
 }
 
@@ -328,7 +339,7 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) 
         }
 
         // Sun contribution
-        Hit sunShadowHit = trace(Ray(hit.block, hit.blockPosition, sunDir), maxStepPerBounce, false);
+        Hit sunShadowHit = trace(Ray(hit.block, hit.blockPosition, randomDirection(texCoord, sunDir * 50, 823.375)), maxStepPerBounce, false);
         accumulated += max(dot(sunDir, hit.normal), 0) * (sunShadowHit.t > EPSILON ? 0 : 1) * SUN_COLOR * weight;
 
         // ""Ambient""/sky contribution
@@ -353,7 +364,7 @@ void try_insert(vec4 color, float depth) {
     if (color.a == 0.0) {
         return;
     }
-
+    
     color_layers[active_layers] = color;
     depth_layers[active_layers] = depth;
 
@@ -407,6 +418,9 @@ void main() {
         texelAccum = blend(texelAccum, color_layers[ii]);
     }
 
+    vec4 prevFrameColor = texture(PreviousFrameSampler, texCoord);
+
     //fragColor = vec4(depth, texture( TranslucentDepthSampler, texCoord ).r, 0, 1);//vec4( texelAccum.rgb, 1.0 );
-    fragColor = vec4(texelAccum.rgb, 1.0);
+    //fragColor = vec4(mix(prevFrameColor.rgb, texelAccum.rgb, 0.05), 1.0);
+    fragColor = vec4(texelAccum.rgb, 1);
 }

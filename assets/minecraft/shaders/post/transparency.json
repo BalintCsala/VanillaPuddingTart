@@ -6,6 +6,7 @@
         "particles",
         "clouds",
         "weather",
+        "copy",
         "final"
     ],
     "passes": [
@@ -59,6 +60,10 @@
                     "id": "weather:depth"
                 },
                 {
+                    "name": "PreviousFrameSampler",
+                    "id": "copy"
+                },
+                {
                     "name": "AtlasSampler",
                     "id": "atlas",
                     "width": 1,
@@ -87,6 +92,11 @@
                     "bilinear": false
                 }
             ]
+        },
+        {
+            "name": "blit",
+            "intarget": "final",
+            "outtarget": "copy"
         },
         {
             "name": "blit",

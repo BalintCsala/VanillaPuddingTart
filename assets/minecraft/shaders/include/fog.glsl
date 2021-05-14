@@ -17,4 +17,5 @@ float linear_fog_fade(float vertexDistance, float fogStart, float fogEnd) {
     }
 
     return smoothstep(fogEnd, fogStart, vertexDistance);
+
 }
