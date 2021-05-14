@@ -175,6 +175,7 @@ vec3 fresnel(vec3 F0, float cosTheta) {
 Hit trace(Ray ray, int maxSteps, bool reflected) {
     float totalT = 0;
     vec3 signedDirection = sign(ray.direction);
+    vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
     // Cap the amount of steps we take to make sure no ifinite loop happens.
     for (int i = 0; i < maxSteps; i++) {
         // The world is divided into blocks, so we can use a simplified tracing algorithm where we always go to the
@@ -191,10 +192,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             if (t > 0 && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
                 Hit hit;
                 hit.t = 999;
-                hit.texCoord = vec2(
-                    (length(thingHitPos.xz) + 0.56) * 1.8 / 2,
-                    0.10 - (thingHitPos.y) / 2
-                );
+                hit.texCoord = vec2((length(thingHitPos.xz) + 0.56) * 1.8 / 2, 0.10 - (thingHitPos.y) / 2);
 
                 vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
                 if (thingColor.x + thingColor.y + thingColor.z > 0) {
@@ -203,31 +201,33 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             }
         }
 
-
-        vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
         // The steps in each direction:
         float t = min(min(steps.x, steps.y), steps.z);
 
         ray.blockPosition += t * ray.direction;
+        steps -= t;
         totalT += t;
 
         // We select the smallest of the steps and update the current block and block position.
         vec3 normal;
         vec2 texCoord;
-        if (steps.x - t < EPSILON) {
+        if (steps.x < EPSILON) {
             normal = vec3(-signedDirection.x, 0, 0);
             ray.currentBlock.x += signedDirection.x;
             ray.blockPosition.x = (1 - signedDirection.x) / 2;
+            steps.x = signedDirection.x / ray.direction.x;
             texCoord = ray.blockPosition.zy;
-        } else if (steps.y - t < EPSILON) {
+        } else if (steps.y < EPSILON) {
             normal = vec3(0, -signedDirection.y, 0);
             ray.currentBlock.y += signedDirection.y;
             ray.blockPosition.y = (1 - signedDirection.y) / 2;
+            steps.y = signedDirection.y / ray.direction.y;
             texCoord = ray.blockPosition.xz;
         } else {
             normal = vec3(0, 0, -signedDirection.z);
             ray.currentBlock.z += signedDirection.z;
             ray.blockPosition.z = (1 - signedDirection.z) / 2;
+            steps.z = signedDirection.z / ray.direction.z;
             texCoord = ray.blockPosition.xy;
         }
         // We can now query if there's a block at the current position.
@@ -321,9 +321,9 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) 
 
     Hit hit;
     float totalT = 0;
-    for (int step = 0; step < 3; step++) {
-        hit = trace(ray, step == 0 ? maxStepPerBounce : 16, false);
-        if (step == 0) {
+    for (int steps = 0; steps < 3; steps++) {
+        hit = trace(ray, steps == 0 ? maxStepPerBounce : 16, false);
+        if (steps == 0) {
             depth = hit.t;
         }
         if (hit.t < EPSILON) {
@@ -343,11 +343,11 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) 
         accumulated += max(dot(sunDir, hit.normal), 0) * (sunShadowHit.t > EPSILON ? 0 : 1) * SUN_COLOR * weight;
 
         // ""Ambient""/sky contribution
-        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(step) + 7.41);
+        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(steps) + 7.41);
         Hit skyShadowHit = trace(Ray(hit.block, hit.blockPosition, skyRayDirection), maxStepPerBounce, false);
         accumulated += SKY_COLOR * (skyShadowHit.t > EPSILON ? 0.4 : 1) * weight;
 
-        vec3 newDir = randomDirection(texCoord, hit.normal, float(step) * 754.54);
+        vec3 newDir = randomDirection(texCoord, hit.normal, float(steps) * 754.54);
         ray = Ray(hit.block, hit.blockPosition, newDir);
     }
 
@@ -364,7 +364,7 @@ void try_insert(vec4 color, float depth) {
     if (color.a == 0.0) {
         return;
     }
-    
+
     color_layers[active_layers] = color;
     depth_layers[active_layers] = depth;
 
