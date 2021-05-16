@@ -1,4 +1,4 @@
-## Before you try it out, read this!
+<h1 style="color:red; text-decoration: underline">Before you try it out, read this!</h1>
 
 **Slight epilepsy warning**, the shader generates a lot of noise (this is by design, imagine a very colorful TV static). Don't try it out if you are prone to seizures. This will be remedied in a future patch.
 
