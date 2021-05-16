@@ -197,37 +197,25 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         totalT += t;
 
         // We select the smallest of the steps and update the current block and block position.
+        vec3 nextBlock = step(steps, vec3(EPSILON));
+
         vec3 normal;
         vec2 texCoord;
-        if (steps.x < EPSILON) {
-            normal = vec3(-signedDirection.x, 0, 0);
-            ray.currentBlock.x += signedDirection.x;
-            ray.blockPosition.x = (1 - signedDirection.x) / 2;
-            steps.x = signedDirection.x / ray.direction.x;
-            texCoord = ray.blockPosition.zy;
-        } else if (steps.y < EPSILON) {
-            normal = vec3(0, -signedDirection.y, 0);
-            ray.currentBlock.y += signedDirection.y;
-            ray.blockPosition.y = (1 - signedDirection.y) / 2;
-            steps.y = signedDirection.y / ray.direction.y;
-            texCoord = ray.blockPosition.xz;
-        } else {
-            normal = vec3(0, 0, -signedDirection.z);
-            ray.currentBlock.z += signedDirection.z;
-            ray.blockPosition.z = (1 - signedDirection.z) / 2;
-            steps.z = signedDirection.z / ray.direction.z;
-            texCoord = ray.blockPosition.xy;
-        }
+
+        normal = -signedDirection * nextBlock;
+        ray.currentBlock += signedDirection * nextBlock;
+        ray.blockPosition = mix(ray.blockPosition, (1 - signedDirection) / 2, nextBlock);
+        steps += signedDirection / ray.direction * nextBlock;
+        texCoord = mix(ray.blockPosition.xy, ray.blockPosition.zz, nextBlock.xy);
+
         // We can now query if there's a block at the current position.
         BlockData blockData = getBlock(ray.currentBlock, texCoord);
 
         if (blockData.type < -90) {
             // We're outside of the known world, there will be dragons. Let's stop
             break;
-        }
-
-        // If it's a block (type is non negative), we stop and draw to the screen.
-        if (blockData.type > 0) {
+        } else if (blockData.type > 0) {
+            // If it's a block (type is non negative), we stop and draw to the screen.
             return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         }
     }
