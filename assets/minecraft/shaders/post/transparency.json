@@ -71,22 +71,8 @@
                     "bilinear": false
                 },
                 {
-                    "name": "IORSampler",
-                    "id": "ior",
-                    "width": 1,
-                    "height": 1,
-                    "bilinear": false
-                },
-                {
                     "name": "SteveSampler",
                     "id": "steve",
-                    "width": 1,
-                    "height": 1,
-                    "bilinear": false
-                },
-                {
-                    "name": "EmissionSampler",
-                    "id": "emission",
                     "width": 1,
                     "height": 1,
                     "bilinear": false
