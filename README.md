@@ -30,8 +30,8 @@ This also only works if the resolution of your monitors exceeds or matches 1024x
 
 These images were taken without any noise reduction. Looks less noisy in-game.
 
-![example1](images/example1.png)
+![example1](images/gi-example1.png)
 
-![example2](images/example2.png)
+![example2](images/gi-example2.png)
 
-![example3](images/example3.png)
+![example3](images/gi-example3.png)
