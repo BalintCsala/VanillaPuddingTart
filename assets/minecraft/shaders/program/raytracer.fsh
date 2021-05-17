@@ -128,6 +128,20 @@ BlockData getBlock(vec3 position, vec2 texCoord) {
     return blockData;
 }
 
+BlockData getBlock_2(vec3 rawData, vec2 texCoord) {
+    BlockData blockData;
+    int data = decodeInt(rawData);
+
+    vec2 blockTexCoord = (vec2(data >> 6, data & 63) + texCoord) / 64;
+    blockData.type = 1;
+    blockData.blockTexCoord = blockTexCoord;
+    blockData.albedo = texture(AtlasSampler, blockTexCoord / 2).rgb;
+    blockData.F0 = texture(AtlasSampler, blockTexCoord / 2 + vec2(0, 0.5)).rgb;
+    blockData.emission = texture(AtlasSampler, blockTexCoord / 2 + vec2(0.5, 0));
+    blockData.metallicity = texture(AtlasSampler, blockTexCoord / 2 + 0.5).r;
+    return blockData;
+}
+
 vec2 getControl(int index, vec2 screenSize) {
     return vec2(floor(screenSize.x / 2.0) + float(index) * 2.0 + 0.5, 0.5) / screenSize;
 }
@@ -199,23 +213,20 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         // We select the smallest of the steps and update the current block and block position.
         vec3 nextBlock = step(steps, vec3(EPSILON));
 
-        vec3 normal;
-        vec2 texCoord;
-
-        normal = -signedDirection * nextBlock;
         ray.currentBlock += signedDirection * nextBlock;
         ray.blockPosition = mix(ray.blockPosition, (1 - signedDirection) / 2, nextBlock);
         steps += signedDirection / ray.direction * nextBlock;
-        texCoord = mix(ray.blockPosition.xy, ray.blockPosition.zz, nextBlock.xy);
 
         // We can now query if there's a block at the current position.
-        BlockData blockData = getBlock(ray.currentBlock, texCoord);
-
-        if (blockData.type < -90) {
+        vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(ray.currentBlock))).rgb;
+        if (any(greaterThan(abs(ray.currentBlock), vec3(LAYER_SIZE / 2 - 1)))) {
             // We're outside of the known world, there will be dragons. Let's stop
             break;
-        } else if (blockData.type > 0) {
+        } else if (3 - rawData.x - rawData.y - rawData.z > EPSILON) {
             // If it's a block (type is non negative), we stop and draw to the screen.
+            vec3 normal = -signedDirection * nextBlock;
+            vec2 texCoord = mix(ray.blockPosition.xy, ray.blockPosition.zz, nextBlock.xy);
+            BlockData blockData = getBlock_2(rawData, texCoord);
             return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         }
     }
