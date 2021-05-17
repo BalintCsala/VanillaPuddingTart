@@ -185,24 +185,6 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         // we need to take to reach a wall in that direction. This could be faster by precomputing 1 divided by the
         // components of the ray's direction, but I'll keep it simple here. Faster algorithms also exist.
 
-        if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y +2) <= 1 ) {
-            vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
-            float t = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, 0, facingDirection.z));
-            vec3 thingHitPos = rayActualPos + ray.direction * t;
-            // Let's check whether the ray will intersect a cylinder
-            if (t > 0 && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
-                Hit hit;
-                hit.t = 999;
-                hit.texCoord = vec2((length(thingHitPos.xz) + 0.56) * 1.8 / 2, 0.10 - (thingHitPos.y) / 2);
-
-                vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
-                if (thingColor.x + thingColor.y + thingColor.z > 0) {
-                    hit.blockData.albedo = thingColor;
-                    return hit;
-                }
-            }
-        }
-
         // The steps in each direction:
         float t = min(min(steps.x, steps.y), steps.z);
 
@@ -228,6 +210,22 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             vec2 texCoord = mix(ray.blockPosition.xy, ray.blockPosition.zz, nextBlock.xy);
             BlockData blockData = getBlock_2(rawData, texCoord);
             return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
+        } else if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y + 2) <= 1 ) {
+            vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
+            float t = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, 1e-5, facingDirection.z));
+            vec3 thingHitPos = rayActualPos + ray.direction * t;
+            // Let's check whether the ray will intersect a cylinder
+            if (t > 0 && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
+                Hit hit;
+                hit.t = 999;
+                hit.texCoord = vec2((length(thingHitPos.xz) + 0.56) * 1.8 / 2, 0.10 - (thingHitPos.y) / 2);
+
+                vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
+                if (thingColor.x + thingColor.y + thingColor.z > 0) {
+                    hit.blockData.albedo = thingColor;
+                    return hit;
+                }
+            }
         }
     }
     Hit hit;
