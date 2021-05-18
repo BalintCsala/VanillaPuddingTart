@@ -185,7 +185,8 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         } else if (3 - rawData.x - rawData.y - rawData.z > EPSILON) {
             // If it's a block (type is non negative), we stop and draw to the screen.
             vec3 normal = -signedDirection * nextBlock;
-            vec2 texCoord = mix(ray.blockPosition.xy, ray.blockPosition.zz, nextBlock.xy);
+            vec2 texCoord = mix((vec2(ray.blockPosition.x, 1.0 - ray.blockPosition.y) - 0.5) * vec2(abs(normal.y) + normal.z, 1.0), 
+                                (vec2(1.0 - ray.blockPosition.z, ray.blockPosition.z) - 0.5) * vec2(normal.x + normal.y), nextBlock.xy) + vec2(0.5);
             BlockData blockData = getBlock(rawData, texCoord);
             return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         } else if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y + 2) <= 1 ) {
