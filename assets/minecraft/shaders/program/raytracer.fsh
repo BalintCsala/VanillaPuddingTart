@@ -106,29 +106,7 @@ int decodeInt(vec3 ivec) {
     return s * (int(ivec.r) + int(ivec.g) * 256 + (int(ivec.b) - 64 + s * 64) * 256 * 256);
 }
 
-BlockData getBlock(vec3 position, vec2 texCoord) {
-    BlockData blockData;
-    vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(position))).rgb;
-    if (any(greaterThan(abs(position), vec3(LAYER_SIZE / 2 - 1)))) {
-        blockData.type = -99;
-        return blockData;
-    } else if (3 - rawData.x - rawData.y - rawData.z < EPSILON) {
-        blockData.type = -1;
-        return blockData;
-    }
-    int data = decodeInt(rawData);
-
-    vec2 blockTexCoord = (vec2(data >> 6, data & 63) + texCoord) / 64;
-    blockData.type = 1;
-    blockData.blockTexCoord = blockTexCoord;
-    blockData.albedo = texture(AtlasSampler, blockTexCoord / 2).rgb;
-    blockData.F0 = texture(AtlasSampler, blockTexCoord / 2 + vec2(0, 0.5)).rgb;
-    blockData.emission = texture(AtlasSampler, blockTexCoord / 2 + vec2(0.5, 0));
-    blockData.metallicity = texture(AtlasSampler, blockTexCoord / 2 + 0.5).r;
-    return blockData;
-}
-
-BlockData getBlock_2(vec3 rawData, vec2 texCoord) {
+BlockData getBlock(vec3 rawData, vec2 texCoord) {
     BlockData blockData;
     int data = decodeInt(rawData);
 
@@ -208,7 +186,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             // If it's a block (type is non negative), we stop and draw to the screen.
             vec3 normal = -signedDirection * nextBlock;
             vec2 texCoord = mix(ray.blockPosition.xy, ray.blockPosition.zz, nextBlock.xy);
-            BlockData blockData = getBlock_2(rawData, texCoord);
+            BlockData blockData = getBlock(rawData, texCoord);
             return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         } else if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y + 2) <= 1 ) {
             vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
