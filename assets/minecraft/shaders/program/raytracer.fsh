@@ -269,8 +269,6 @@ vec3 traceGlobalIllumination(Ray ray, out float depth, float traceSeed, bool ref
         vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(steps) + 7.41 + traceSeed);
         Ray skyRay = Ray(hit.block, hit.blockPosition, skyRayDirection);
         Hit skyShadowHit = trace(skyRay, MAX_STEPS, true);
-        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(steps) + 7.41);
-        Hit skyShadowHit = trace(Ray(hit.block, hit.blockPosition, skyRayDirection), maxStepPerBounce, false);
         accumulated += SKY_COLOR * (skyShadowHit.t > EPSILON ? 0.4 : 1) * weight;
 
         vec3 newDir = randomDirection(texCoord, hit.normal, float(steps) * 754.54 + traceSeed);
