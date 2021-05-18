@@ -190,11 +190,11 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         } else if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y + 2) <= 1 ) {
             vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
-            float t = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, 1e-5, facingDirection.z));
-            vec3 thingHitPos = rayActualPos + ray.direction * t;
+            float t2 = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, 1e-5, facingDirection.z));
+            vec3 thingHitPos = rayActualPos + ray.direction * t2;
             float nextBlockDepth = min(min(steps.x, steps.y), steps.z);
             // Let's check whether the ray will intersect a cylinder
-            if (abs(2.0 * t - nextBlockDepth) < nextBlockDepth && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
+            if (abs(2.0 * t2 - nextBlockDepth) < nextBlockDepth && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
                 Hit hit;
                 hit.t = 999;
                 hit.texCoord = vec2((length(thingHitPos.xz) + 0.56) * 1.8 / 2, 0.10 - (thingHitPos.y) / 2);
@@ -221,7 +221,7 @@ vec3 traceGlobalIllumination(Ray ray, out float depth, float traceSeed, bool ref
     for (int steps = 0; steps < MAX_GLOBAL_ILLUMINATION_BOUNCES; steps++) {
         hit = trace(ray, steps == 0 ? MAX_STEPS : MAX_GLOBAL_ILLUMINATION_STEPS, steps > 0 || reflected);
         if (steps == 0) {
-            depth = hit.t;
+            depth = hit.t + near;
         }
         if (hit.t < EPSILON) {
             accumulated += SKY_COLOR * weight;
