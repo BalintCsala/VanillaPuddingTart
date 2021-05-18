@@ -6,6 +6,7 @@
         "particles",
         "clouds",
         "weather",
+        "copy",
         "final"
     ],
     "passes": [
@@ -59,15 +60,12 @@
                     "id": "weather:depth"
                 },
                 {
-                    "name": "AtlasSampler",
-                    "id": "atlas",
-                    "width": 1,
-                    "height": 1,
-                    "bilinear": false
+                    "name": "PreviousFrameSampler",
+                    "id": "copy"
                 },
                 {
-                    "name": "IORSampler",
-                    "id": "ior",
+                    "name": "AtlasSampler",
+                    "id": "atlas",
                     "width": 1,
                     "height": 1,
                     "bilinear": false
@@ -78,15 +76,13 @@
                     "width": 1,
                     "height": 1,
                     "bilinear": false
-                },
-                {
-                    "name": "EmissionSampler",
-                    "id": "emission",
-                    "width": 1,
-                    "height": 1,
-                    "bilinear": false
                 }
             ]
+        },
+        {
+            "name": "blit",
+            "intarget": "final",
+            "outtarget": "copy"
         },
         {
             "name": "blit",

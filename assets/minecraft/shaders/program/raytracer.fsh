@@ -1,11 +1,13 @@
 #version 150
 
 const float PI = 3.141592654;
-const float EPSILON = 0.001;
+const float EPSILON = 0.00001;
 const int MAX_STEPS = 100;
-const int MAX_BOUNCES = 40;
+const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
+const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
+const int MAX_REFLECTION_BOUNCES = 10;
 const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
-const vec3 SKY_COLOR = 0.5 * vec3(0.2, 0.35, 0.5);
+const vec3 SKY_COLOR = 1 * vec3(0.2, 0.35, 0.5);
 const float MAX_EMISSION_STRENGTH = 5;
 // I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
 // This should just barely fit 8, 88 deep layers vertically (8 * 88 + 1 control line = 705)
@@ -27,9 +29,8 @@ uniform sampler2D WeatherDepthSampler;
 uniform sampler2D CloudsSampler;
 uniform sampler2D CloudsDepthSampler;
 uniform sampler2D AtlasSampler;
-uniform sampler2D IORSampler;
 uniform sampler2D SteveSampler;
-uniform sampler2D EmissionSampler;
+//uniform sampler2D PreviousFrameSampler;
 uniform vec2 OutSize;
 uniform float Time;
 
@@ -62,6 +63,7 @@ struct BlockData {
     vec3 albedo;
     vec3 F0;
     vec4 emission;
+    float metallicity;
 };
 
 struct Hit {
@@ -116,11 +118,13 @@ BlockData getBlock(vec3 position, vec2 texCoord) {
     }
     int data = decodeInt(rawData);
 
+    vec2 blockTexCoord = (vec2(data >> 6, data & 63) + texCoord) / 64;
     blockData.type = 1;
-    blockData.blockTexCoord = (vec2(data >> 6, data & 63) + texCoord) / 64;
-    blockData.albedo = texture(AtlasSampler, blockData.blockTexCoord).rgb;
-    blockData.F0 = texture(IORSampler, blockData.blockTexCoord).rgb;
-    blockData.emission = texture(EmissionSampler, blockData.blockTexCoord);
+    blockData.blockTexCoord = blockTexCoord;
+    blockData.albedo = texture(AtlasSampler, blockTexCoord / 2).rgb;
+    blockData.F0 = texture(AtlasSampler, blockTexCoord / 2 + vec2(0, 0.5)).rgb;
+    blockData.emission = texture(AtlasSampler, blockTexCoord / 2 + vec2(0.5, 0));
+    blockData.metallicity = texture(AtlasSampler, blockTexCoord / 2 + 0.5).r;
     return blockData;
 }
 
@@ -128,36 +132,27 @@ vec2 getControl(int index, vec2 screenSize) {
     return vec2(floor(screenSize.x / 2.0) + float(index) * 2.0 + 0.5, 0.5) / screenSize;
 }
 
-float intersectCircle(vec2 origin, vec2 direction, vec2 center, float radius) {
-    float a = dot(direction, direction);
-    float b = 2 * dot(origin, direction) - 2 * dot(center, direction);
-    float c = dot(origin, origin) + dot(center, center) - 2 * dot(origin, center) - radius * radius;
-
-    float disc = b * b - 4 * a * c;
-    if (disc < 0) {
-        return -1;
-    }
-
-    float t1 = (-b + sqrt(disc)) / 2 / a;
-    float t2 = (-b - sqrt(disc)) / 2 / a;
-
-    if (t1 <= 0 && t2 <= 0) {
-        return -1;
-    } else if (t2 <= 0) {
-        return t1;
-    } else if (t1 <= 0) {
-        return t2;
-    } else {
-        return min(t1, t2);
-    }
-}
-
 float intersectPlane(vec3 origin, vec3 direction, vec3 normal) {
     return dot(-origin, normal) / dot(direction, normal);
 }
 
-float rand(vec2 co){
-    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+// By Inigo Quilez - https://www.shadertoy.com/view/XlXcW4
+const uint k = 1103515245U;
+
+vec3 hash(uvec3 x) {
+    x = ((x >> 8U) ^ x.yzx) * k;
+    x = ((x >> 8U) ^ x.yzx) * k;
+    x = ((x >> 8U) ^ x.yzx) * k;
+
+    return vec3(x) * (1.0 / float(0xffffffffU));
+}
+
+vec3 randomDirection(vec2 coords, vec3 normal, float seed) {
+    uvec3 p = uvec3(coords * 5000, (Time * 32.46432 + seed) * 60);
+    vec3 v = hash(p);
+    float angle = 2 * PI * v.x;
+    float u = 2 * v.y - 1;
+    return normalize(normal + vec3(sqrt(1 - u * u) * vec2(cos(angle), sin(angle)), u));
 }
 
 vec3 fresnel(vec3 F0, float cosTheta) {
@@ -188,6 +183,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
 
                 vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
                 if (thingColor.x + thingColor.y + thingColor.z > 0) {
+                    hit.blockData.albedo = thingColor;
                     return hit;
                 }
             }
@@ -240,79 +236,14 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
     return hit;
 }
 
-BounceHit traceBounces(Ray ray, int maxBounces, int maxStepPerBounce, vec3 skyColor, out float depth) {
-    vec3 weight = vec3(1);
-    BounceHit res;
-    res.color = vec3(0);
-
-    Hit hit = trace(ray, maxStepPerBounce, false);
-    depth = hit.t;
-    for (int i = 0; i < maxBounces; i++) {
-        if (hit.t > 900) {
-            res.color += texture(SteveSampler, hit.texCoord).rgb * weight;
-            res.finalDirection = ray.direction;
-            res.t = hit.t;
-            return res;
-        } else if (hit.t < 0) {
-            res.color += skyColor * weight;
-            res.finalDirection = ray.direction;
-            res.t = hit.t;
-            return res;
-        }
-
-        vec3 F0 = hit.blockData.F0;
-        // Probably should be replaced by metallicity
-        if (dot(F0, F0) > 0) {
-            // Metallic
-            if (i == maxBounces - 1) {
-                // If we reached the end, just draw the reflectance factor
-                // Not that elegant, but works
-                res.color += F0 * weight;
-                res.finalDirection = ray.direction;
-                res.t = hit.t;
-                res.block = hit.block;
-                res.blockPosition = hit.blockPosition;
-                res.normal = hit.normal;
-                return res;
-            } else {
-                // Otherwise bounce the ray back
-                weight *= fresnel(F0, dot(-ray.direction, hit.normal));
-                ray = Ray(hit.block, hit.blockPosition, reflect(ray.direction, hit.normal));
-                hit = trace(ray, maxStepPerBounce, true);
-            }
-        } else {
-            // Diffuse
-            res.color += hit.blockData.albedo * weight;
-            res.finalDirection = ray.direction;
-            res.t = hit.t;
-            res.block = hit.block;
-            res.blockPosition = hit.blockPosition;
-            res.normal = hit.normal;
-            return res;
-        }
-    }
-    res.finalDirection = ray.direction;
-    res.t = hit.t;
-    res.block = hit.block;
-    res.blockPosition = hit.blockPosition;
-    res.normal = hit.normal;
-    return res;
-}
-
-vec3 randomDirection(vec2 coords, vec3 normal, float seed) {
-    float angle = 2 * PI * rand(coords + seed + Time);
-    float u = 2 * rand(coords + seed + PI + Time) - 1;
-    return normalize(normal + vec3(sqrt(1 - u * u) * vec2(cos(angle), sin(angle)), u));
-}
-
-vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) {
+vec3 traceGlobalIllumination(Ray ray, out float depth, float traceSeed, bool reflected) {
     vec3 accumulated = vec3(0);
     vec3 weight = vec3(1);
 
     Hit hit;
     float totalT = 0;
-    for (int steps = 0; steps < 3; steps++) {
-        hit = trace(ray, steps == 0 ? maxStepPerBounce : 16, false);
+    for (int steps = 0; steps < MAX_GLOBAL_ILLUMINATION_BOUNCES; steps++) {
+        hit = trace(ray, steps == 0 ? MAX_STEPS : MAX_GLOBAL_ILLUMINATION_STEPS, steps > 0 || reflected);
         if (steps == 0) {
             depth = hit.t;
         }
@@ -322,23 +253,59 @@ vec3 traceScene(Ray ray, int maxBounces, int maxStepPerBounce, out float depth) 
         }
         totalT += hit.t;
 
-        weight *= hit.blockData.albedo;
+        weight *= hit.blockData.albedo * (1 - fresnel(hit.blockData.F0, 1 - dot(ray.direction, hit.normal)));
 
         if (hit.blockData.emission.a > 0) {
             accumulated += hit.blockData.emission.rgb * MAX_EMISSION_STRENGTH * weight;
         }
 
         // Sun contribution
-        Hit sunShadowHit = trace(Ray(hit.block, hit.blockPosition, sunDir), maxStepPerBounce, false);
+        vec3 sunCheckDir = randomDirection(texCoord, sunDir * 50, float(steps) + 823.375 + traceSeed);
+        Ray sunRay = Ray(hit.block, hit.blockPosition, sunCheckDir);
+        Hit sunShadowHit = trace(sunRay, MAX_STEPS, true);
         accumulated += max(dot(sunDir, hit.normal), 0) * (sunShadowHit.t > EPSILON ? 0 : 1) * SUN_COLOR * weight;
 
         // ""Ambient""/sky contribution
+        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(steps) + 7.41 + traceSeed);
+        Ray skyRay = Ray(hit.block, hit.blockPosition, skyRayDirection);
+        Hit skyShadowHit = trace(skyRay, MAX_STEPS, true);
         vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(steps) + 7.41);
         Hit skyShadowHit = trace(Ray(hit.block, hit.blockPosition, skyRayDirection), maxStepPerBounce, false);
         accumulated += SKY_COLOR * (skyShadowHit.t > EPSILON ? 0.4 : 1) * weight;
 
-        vec3 newDir = randomDirection(texCoord, hit.normal, float(steps) * 754.54);
+        vec3 newDir = randomDirection(texCoord, hit.normal, float(steps) * 754.54 + traceSeed);
         ray = Ray(hit.block, hit.blockPosition, newDir);
+    }
+
+    return accumulated;
+}
+
+vec3 traceReflections(Ray ray, out float depth) {
+    vec3 accumulated = vec3(0);
+    vec3 weight = vec3(1);
+
+    vec3 diff = traceGlobalIllumination(ray, depth, 31.43, false);
+    accumulated += weight * diff;
+
+    Hit hit;
+    for (int steps = 0; steps < MAX_REFLECTION_BOUNCES; steps++) {
+        hit = trace(ray, MAX_STEPS, steps > 0);
+
+        if (hit.t < EPSILON) {
+            accumulated += SKY_COLOR * weight;
+            break;
+        }
+
+        weight *= fresnel(hit.blockData.F0, 1 - dot(ray.direction, hit.normal));
+
+        if (dot(weight, weight) < 0.001)
+            break;
+
+        ray = Ray(hit.block, hit.blockPosition, reflect(ray.direction, hit.normal));
+        float _;
+        vec3 diffuse = traceGlobalIllumination(ray, _, 456.56 * (float(steps) + 1), true);
+        accumulated += weight * diffuse;
+
     }
 
     return accumulated;
@@ -387,7 +354,7 @@ void main() {
     Ray ray = Ray(vec3(-1), 1 - chunkOffset, normalize(rayDir));
 
     float depth;
-    vec3 color = traceScene(ray, MAX_BOUNCES, MAX_STEPS, depth);
+    vec3 color = traceReflections(ray, depth);
 
     if (depth < 0) depth = far;
 
@@ -408,6 +375,5 @@ void main() {
         texelAccum = blend(texelAccum, color_layers[ii]);
     }
 
-    //fragColor = vec4(depth, texture( TranslucentDepthSampler, texCoord ).r, 0, 1);//vec4( texelAccum.rgb, 1.0 );
-    fragColor = vec4(texelAccum.rgb, 1.0);
+    fragColor = vec4(texelAccum.rgb, 1);
 }
