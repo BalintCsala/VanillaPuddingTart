@@ -106,16 +106,8 @@ int decodeInt(vec3 ivec) {
     return s * (int(ivec.r) + int(ivec.g) * 256 + (int(ivec.b) - 64 + s * 64) * 256 * 256);
 }
 
-BlockData getBlock(vec3 position, vec2 texCoord) {
+BlockData getBlock(vec3 rawData, vec2 texCoord) {
     BlockData blockData;
-    vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(position))).rgb;
-    if (any(greaterThan(abs(position), vec3(LAYER_SIZE / 2 - 1)))) {
-        blockData.type = -99;
-        return blockData;
-    } else if (3 - rawData.x - rawData.y - rawData.z < EPSILON) {
-        blockData.type = -1;
-        return blockData;
-    }
     int data = decodeInt(rawData);
 
     vec2 blockTexCoord = (vec2(data >> 6, data & 63) + texCoord) / 64;
@@ -171,9 +163,34 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         // we need to take to reach a wall in that direction. This could be faster by precomputing 1 divided by the
         // components of the ray's direction, but I'll keep it simple here. Faster algorithms also exist.
 
-        if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y +2) <= 1 ) {
+        // The steps in each direction:
+        float t = min(min(steps.x, steps.y), steps.z);
+
+        ray.blockPosition += t * ray.direction;
+        steps -= t;
+        totalT += t;
+
+        // We select the smallest of the steps and update the current block and block position.
+        vec3 nextBlock = step(steps, vec3(EPSILON));
+
+        ray.currentBlock += signedDirection * nextBlock;
+        ray.blockPosition = mix(ray.blockPosition, (1 - signedDirection) / 2, nextBlock);
+        steps += signedDirection / ray.direction * nextBlock;
+
+        // We can now query if there's a block at the current position.
+        vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(ray.currentBlock))).rgb;
+        if (any(greaterThan(abs(ray.currentBlock), vec3(LAYER_SIZE / 2 - 1)))) {
+            // We're outside of the known world, there will be dragons. Let's stop
+            break;
+        } else if (3 - rawData.x - rawData.y - rawData.z > EPSILON) {
+            // If it's a block (type is non negative), we stop and draw to the screen.
+            vec3 normal = -signedDirection * nextBlock;
+            vec2 texCoord = mix(ray.blockPosition.xy, ray.blockPosition.zz, nextBlock.xy);
+            BlockData blockData = getBlock(rawData, texCoord);
+            return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
+        } else if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y + 2) <= 1 ) {
             vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
-            float t = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, 0, facingDirection.z));
+            float t = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, 1e-5, facingDirection.z));
             vec3 thingHitPos = rayActualPos + ray.direction * t;
             // Let's check whether the ray will intersect a cylinder
             if (t > 0 && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
@@ -187,48 +204,6 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
                     return hit;
                 }
             }
-        }
-
-        // The steps in each direction:
-        float t = min(min(steps.x, steps.y), steps.z);
-
-        ray.blockPosition += t * ray.direction;
-        steps -= t;
-        totalT += t;
-
-        // We select the smallest of the steps and update the current block and block position.
-        vec3 normal;
-        vec2 texCoord;
-        if (steps.x < EPSILON) {
-            normal = vec3(-signedDirection.x, 0, 0);
-            ray.currentBlock.x += signedDirection.x;
-            ray.blockPosition.x = (1 - signedDirection.x) / 2;
-            steps.x = signedDirection.x / ray.direction.x;
-            texCoord = ray.blockPosition.zy;
-        } else if (steps.y < EPSILON) {
-            normal = vec3(0, -signedDirection.y, 0);
-            ray.currentBlock.y += signedDirection.y;
-            ray.blockPosition.y = (1 - signedDirection.y) / 2;
-            steps.y = signedDirection.y / ray.direction.y;
-            texCoord = ray.blockPosition.xz;
-        } else {
-            normal = vec3(0, 0, -signedDirection.z);
-            ray.currentBlock.z += signedDirection.z;
-            ray.blockPosition.z = (1 - signedDirection.z) / 2;
-            steps.z = signedDirection.z / ray.direction.z;
-            texCoord = ray.blockPosition.xy;
-        }
-        // We can now query if there's a block at the current position.
-        BlockData blockData = getBlock(ray.currentBlock, texCoord);
-
-        if (blockData.type < -90) {
-            // We're outside of the known world, there will be dragons. Let's stop
-            break;
-        }
-
-        // If it's a block (type is non negative), we stop and draw to the screen.
-        if (blockData.type > 0) {
-            return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         }
     }
     Hit hit;
