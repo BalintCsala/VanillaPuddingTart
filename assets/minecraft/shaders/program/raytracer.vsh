@@ -3,6 +3,9 @@
 const float PROJNEAR = 0.05;
 const float FPRECISION = 4000000.0;
 const float EPSILON = 0.001;
+const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
+const float LAYER_SIZE = 88;
+const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
 
 in vec4 Position;
 
@@ -10,6 +13,7 @@ uniform mat4 ProjMat;
 uniform vec2 OutSize;
 uniform sampler2D DiffuseSampler;
 uniform sampler2D PreviousFrameDataSampler;
+uniform float Time;
 
 out vec2 texCoord;
 out vec2 oneTexel;
@@ -22,7 +26,22 @@ out vec3 rayDir;
 out vec3 facingDirection;
 out float near;
 out float far;
-out vec3 movement;
+// out vec3 movement;
+out float steveCoordOffset;
+
+vec2 pixelToTexCoord(vec2 pixel) {
+    return pixel / (VOXEL_STORAGE_RESOLUTION - 1);
+}
+
+vec2 blockToPixel(vec3 position) {
+    // The block data is split into layers. Each layer is 60x60 blocks and represents a single y height.
+    // Therefore the position inside a layer is just the position of the block on the xz plane relative to the player.
+    vec2 inLayerPos = position.xz + LAYER_SIZE / 2;
+    // There are 60 layers, we store them in an 8x8 area.
+    vec2 layerStart = vec2(mod(position.y + LAYER_SIZE / 2, STORAGE_DIMENSIONS.y), floor((position.y + LAYER_SIZE / 2) / STORAGE_DIMENSIONS.y)) * LAYER_SIZE;
+    // The 0.5 offset is to read the center of the "pixels", the +1 offset on the y is to not interfere with the control line
+    return layerStart + inLayerPos + vec2(0.5, 1.5);
+}
 
 int decodeInt(vec3 ivec) {
     ivec *= 255.0;
@@ -76,7 +95,7 @@ void main() {
         decodeFloat(texture(PreviousFrameDataSampler, start + 102 * inc).xyz)
     );
 
-    movement = chunkOffset - prevChunkOffset;
+    vec3 movement = abs(chunkOffset - prevChunkOffset);
 
     float fov = atan(1 / projMat[1][1]);
 
@@ -90,4 +109,13 @@ void main() {
     projInv = inverse(projMat * modelViewMat);
     rayDir = (projInv * vec4(outPos.xy * (far - near), far + near, far - near)).xyz;
     facingDirection = (vec4(0, 0, -1, 0) * modelViewMat).xyz;
+
+    steveCoordOffset = 0.0;
+    if (movement.x + movement.y + movement.z > EPSILON) {
+        steveCoordOffset += (floor(fract(Time * 2) / 0.5) + 1) / 6;
+    }
+    if (chunkOffset.y > 0.7) {
+        vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(vec3(-1, -3, -1)))).rgb;
+        steveCoordOffset += 0.5 * step(rawData.x + rawData.y + rawData.z, 3.0 - EPSILON);
+    }
 }
