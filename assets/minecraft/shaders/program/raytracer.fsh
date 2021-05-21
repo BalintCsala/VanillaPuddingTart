@@ -209,7 +209,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
                 hit.texCoord = vec2((dot(thingHitPos.xz, vec2(-horizontalFacingDirection.y, horizontalFacingDirection.x)) + 0.5) / 6, 0.10 - thingHitPos.y / 2);
 
                 if (chunkOffset.y > 0.7) {
-                    vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(vec3(thingHitPos.x + 0.5, -3, thingHitPos.z - 1)))).rgb;
+                    vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(vec3(thingHitPos.x - 1, -3, thingHitPos.z - 1)))).rgb;
                     if (3 - rawData.x - rawData.y - rawData.z > EPSILON) {
                         hit.texCoord.x += 0.5;
                     }
