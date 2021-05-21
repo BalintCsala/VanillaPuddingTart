@@ -88,8 +88,8 @@ The texture is divided into 4 parts:
 
 - The top left corner is the normal texture atlas (albedo if you will)
 - The top right corner is emission information. Transparent is no emission (you need to lay the atlas on top of this temporarily, if you want to edit it).
-- The bottom left corner is IOR (essentially reflection color). Generally should be gray for non-metallic (dielectric) materials and colored for metals.
-- The bottom right corner is metallicity (red channel). In the future this will also hold other miscellaneous values, like roughness.
+- The bottom left corner is F0 (amount of refraction when looking at a surface directly, essentially reflection color). Generally should be gray for non-metallic (dielectric) materials and colored for metals.
+- The bottom right corner is a combined metallicity (red channel) and roughness (green channel) map. In the future this will also hold other miscellaneous values, like roughness.
 
 ## Pro mode
 

@@ -64,6 +64,7 @@ struct BlockData {
     vec3 F0;
     vec4 emission;
     float metallicity;
+    float rougness;
 };
 
 struct Hit {
@@ -116,7 +117,10 @@ BlockData getBlock(vec3 rawData, vec2 texCoord) {
     blockData.albedo = texture(AtlasSampler, blockTexCoord / 2).rgb;
     blockData.F0 = texture(AtlasSampler, blockTexCoord / 2 + vec2(0, 0.5)).rgb;
     blockData.emission = texture(AtlasSampler, blockTexCoord / 2 + vec2(0.5, 0));
-    blockData.metallicity = texture(AtlasSampler, blockTexCoord / 2 + 0.5).r;
+
+    vec4 combined = texture(AtlasSampler, blockTexCoord / 2 + 0.5);
+    blockData.metallicity = combined.r;
+    blockData.rougness = combined.g;
     return blockData;
 }
 
@@ -139,12 +143,14 @@ vec3 hash(uvec3 x) {
     return vec3(x) * (1.0 / float(0xffffffffU));
 }
 
-vec3 randomDirection(vec2 coords, vec3 normal, float seed) {
+vec3 randomDirection(vec2 coords, vec3 normal, float seed, float deviateFactor) {
     uvec3 p = uvec3(coords * 5000, (Time * 32.46432 + seed) * 60);
     vec3 v = hash(p);
     float angle = 2 * PI * v.x;
     float u = 2 * v.y - 1;
-    return normalize(normal + vec3(sqrt(1 - u * u) * vec2(cos(angle), sin(angle)), u));
+
+    vec3 directionOffset = vec3(sqrt(1 - u * u) * vec2(cos(angle), sin(angle)), u);
+    return normalize(normal + directionOffset * deviateFactor);
 }
 
 vec3 fresnel(vec3 F0, float cosTheta) {
@@ -237,18 +243,18 @@ vec3 traceGlobalIllumination(Ray ray, out float depth, float traceSeed, bool ref
         }
 
         // Sun contribution
-        vec3 sunCheckDir = randomDirection(texCoord, sunDir * 50, float(steps) + 823.375 + traceSeed);
+        vec3 sunCheckDir = randomDirection(texCoord, sunDir, float(steps) + 823.375 + traceSeed, 0.02);
         Ray sunRay = Ray(hit.block, hit.blockPosition, sunCheckDir);
         Hit sunShadowHit = trace(sunRay, MAX_STEPS, true);
         accumulated += max(dot(sunDir, hit.normal), 0) * (sunShadowHit.t > EPSILON ? 0 : 1) * SUN_COLOR * weight;
 
         // ""Ambient""/sky contribution
-        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(steps) + 7.41 + traceSeed);
+        vec3 skyRayDirection = randomDirection(texCoord, hit.normal, float(steps) + 7.41 + traceSeed, 1);
         Ray skyRay = Ray(hit.block, hit.blockPosition, skyRayDirection);
         Hit skyShadowHit = trace(skyRay, MAX_STEPS, true);
         accumulated += SKY_COLOR * (skyShadowHit.t > EPSILON ? 0.4 : 1) * weight;
 
-        vec3 newDir = randomDirection(texCoord, hit.normal, float(steps) * 754.54 + traceSeed);
+        vec3 newDir = randomDirection(texCoord, hit.normal, float(steps) * 754.54 + traceSeed, 1);
         ray = Ray(hit.block, hit.blockPosition, newDir);
     }
 
@@ -276,7 +282,10 @@ vec3 traceReflections(Ray ray, out float depth) {
         if (dot(weight, weight) < 0.001)
             break;
 
-        ray = Ray(hit.block, hit.blockPosition, reflect(ray.direction, hit.normal));
+        vec3 reflectedDirection = reflect(ray.direction, hit.normal);
+        vec3 newDir = randomDirection(texCoord, reflectedDirection, float(steps) * 63.46103, hit.blockData.rougness);
+
+        ray = Ray(hit.block, hit.blockPosition, newDir);
         float _;
         vec3 diffuse = traceGlobalIllumination(ray, _, 456.56 * (float(steps) + 1), true);
         accumulated += weight * diffuse;
