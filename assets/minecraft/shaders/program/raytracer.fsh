@@ -8,6 +8,7 @@ const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
 const int MAX_REFLECTION_BOUNCES = 10;
 const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
 const vec3 SKY_COLOR = 2.0 * vec3(0.2, 0.35, 0.5);
+const float SUN_ANGULAR_SIZE = 0.01;
 const float MAX_EMISSION_STRENGTH = 5;
 // I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
 // This should just barely fit 8, 88 deep layers vertically (8 * 88 + 1 control line = 705)
@@ -53,11 +54,11 @@ in float steveCoordOffset;
 out vec4 fragColor;
 
 struct Ray {
-// Index of the block the ray is in.
+    // Index of the block the ray is in.
     vec3 currentBlock;
-// Position of the ray inside the block.
+    // Position of the ray inside the block.
     vec3 blockPosition;
-// The direction of the ray
+    // The direction of the ray
     vec3 direction;
 };
 
@@ -68,7 +69,7 @@ struct BlockData {
     vec3 F0;
     vec4 emission;
     float metallicity;
-    float rougness;
+    float roughness;
 };
 
 struct Hit {
@@ -124,7 +125,7 @@ BlockData getBlock(vec3 rawData, vec2 texCoord) {
 
     vec4 combined = texture(AtlasSampler, blockTexCoord / 2 + 0.5);
     blockData.metallicity = combined.r;
-    blockData.rougness = combined.g;
+    blockData.roughness = combined.g;
     return blockData;
 }
 
@@ -192,7 +193,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
         if (any(greaterThan(abs(ray.currentBlock), vec3(LAYER_SIZE / 2 - 1)))) {
             // We're outside of the known world, there will be dragons. Let's stop
             break;
-        } else if (3 - EPSILON > rawData.x + rawData.y + rawData.z) {
+        } else if (rawData.x + rawData.y + rawData.z + EPSILON < 3) {
             vec3 normal = -signedDirection * nextBlock;
             vec2 texCoord = mix((vec2(ray.blockPosition.x, 1.0 - ray.blockPosition.y) - 0.5) * vec2(abs(normal.y) + normal.z, 1.0),
                                 (vec2(1.0 - ray.blockPosition.z, ray.blockPosition.z) - 0.5) * vec2(normal.x + normal.y), nextBlock.xy) + vec2(0.5);
@@ -237,7 +238,7 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
 
         // Summon rays
         vec3 direction = randomDirection(texCoord, hit.normal, float(steps) * 754.54 + traceSeed, 1.0);
-        vec3 sunDirection = randomDirection(texCoord, sunDir, float(steps) + 823.375 + traceSeed, 0.01);
+        vec3 sunDirection = randomDirection(texCoord, sunDir, float(steps) + 823.375 + traceSeed, SUN_ANGULAR_SIZE);
         float NdotL = max(dot(sunDir, hit.normal), 0.0);
 
         ray = Ray(hit.block, hit.blockPosition, direction);
@@ -250,8 +251,8 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
         accumulated += hit.blockData.emission.rgb * MAX_EMISSION_STRENGTH * hit.blockData.emission.a * weight;
         accumulated += sqrt(NdotL) * step(sunlightHit.traceLength, EPSILON) * pow(SUN_COLOR, vec3(GAMMA_CORRECTION)) * weight;
 
-        // Didn't hit a block, considered as hitted sky
         if (hit.traceLength < EPSILON) {
+            // Didn't hit a block, we'll draw the sky
             accumulated += pow(SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
             break;
         }
@@ -268,10 +269,11 @@ vec3 pathTrace(Ray ray, out float depth) {
     Hit hit = trace(ray, MAX_STEPS, false);
     depth = hit.traceLength + near;
 
-    // Sky
     if (hit.traceLength < EPSILON) {
+        // We didn't hit anything
         depth = far;
-        return pow(SKY_COLOR, vec3(GAMMA_CORRECTION));
+        float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
+        return pow(sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
     }
 
     // Global Illumination
@@ -281,16 +283,17 @@ vec3 pathTrace(Ray ray, out float depth) {
     // Reflection
     for (int steps = 0; steps < MAX_REFLECTION_BOUNCES; steps++) {
         weight *= fresnel(hit.blockData.F0, 1 - dot(ray.direction, hit.normal));
-        if (dot(weight, hit.blockData.F0) < 5e-3) {
+        if (dot(weight, weight) < EPSILON) {
             break;
         }
 
         vec3 direction = reflect(ray.direction, hit.normal);
-        direction = randomDirection(texCoord, direction, float(steps) * 63.46103, hit.blockData.rougness);
+        direction = randomDirection(texCoord, direction, float(steps) * 63.46103, hit.blockData.roughness);
         ray = Ray(hit.block, hit.blockPosition, direction);
         hit = trace(ray, MAX_STEPS, true);
 
         if (hit.traceLength < EPSILON) {
+            // We didn't hit anything
             accumulated += pow(SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
             break;
         }
@@ -332,7 +335,7 @@ void try_insert(vec4 color, float depth) {
     }
 }
 
-vec3 blend( vec3 dst, vec4 src ) {
+vec3 blend(vec3 dst, vec4 src) {
     return (dst * (1.0 - src.a)) + src.rgb;
 }
 
@@ -380,7 +383,6 @@ void main() {
     Ray ray = Ray(vec3(-1), 1 - chunkOffset, normalize(rayDir));
 
     float depth;
-    // vec3 color = traceReflections(ray, depth);
     vec3 color = pathTrace(ray, depth);
 
     if (depth < 0) depth = far;
@@ -406,4 +408,5 @@ void main() {
     texelAccum = pow(texelAccum, vec3(1.0 / GAMMA_CORRECTION));
 
     fragColor = vec4(texelAccum.rgb, 1);
+    //fragColor = vec4(mix(fragColor.rgb, texture(PreviousFrameSampler, texCoord).rgb, 0.95), 1);
 }
