@@ -9,6 +9,7 @@ in vec4 Position;
 uniform mat4 ProjMat;
 uniform vec2 OutSize;
 uniform sampler2D DiffuseSampler;
+uniform sampler2D PreviousFrameDataSampler;
 
 out vec2 texCoord;
 out vec2 oneTexel;
@@ -21,6 +22,7 @@ out vec3 rayDir;
 out vec3 facingDirection;
 out float near;
 out float far;
+out vec3 movement;
 
 int decodeInt(vec3 ivec) {
     ivec *= 255.0;
@@ -67,6 +69,14 @@ void main() {
             decodeFloat(texture(DiffuseSampler, start + 101 * inc).xyz),
             decodeFloat(texture(DiffuseSampler, start + 102 * inc).xyz)
     );
+
+    vec3 prevChunkOffset = vec3(
+        decodeFloat(texture(PreviousFrameDataSampler, start + 100 * inc).xyz),
+        decodeFloat(texture(PreviousFrameDataSampler, start + 101 * inc).xyz),
+        decodeFloat(texture(PreviousFrameDataSampler, start + 102 * inc).xyz)
+    );
+
+    movement = chunkOffset - prevChunkOffset;
 
     float fov = atan(1 / projMat[1][1]);
 

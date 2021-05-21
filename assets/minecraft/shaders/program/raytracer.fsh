@@ -45,6 +45,7 @@ in vec3 rayDir;
 in vec3 facingDirection;
 in float near;
 in float far;
+in vec3 movement;
 
 out vec4 fragColor;
 
@@ -189,7 +190,6 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             // We're outside of the known world, there will be dragons. Let's stop
             break;
         } else if (3 - rawData.x - rawData.y - rawData.z > EPSILON) {
-            // If it's a block (type is non negative), we stop and draw to the screen.
             vec3 normal = -signedDirection * nextBlock;
             vec2 texCoord = mix((vec2(ray.blockPosition.x, 1.0 - ray.blockPosition.y) - 0.5) * vec2(abs(normal.y) + normal.z, 1.0), 
                                 (vec2(1.0 - ray.blockPosition.z, ray.blockPosition.z) - 0.5) * vec2(normal.x + normal.y), nextBlock.xy) + vec2(0.5);
@@ -197,14 +197,27 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
             return Hit(totalT, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         } else if (reflected && abs(ray.currentBlock.x + 1) <= 1 && abs(ray.currentBlock.z + 1) <= 1 && abs(ray.currentBlock.y + 2) <= 1 ) {
             vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
-            float t2 = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, 1e-5, facingDirection.z));
+            float t2 = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, EPSILON, facingDirection.z));
             vec3 thingHitPos = rayActualPos + ray.direction * t2;
             float nextBlockDepth = min(min(steps.x, steps.y), steps.z);
             // Let's check whether the ray will intersect a cylinder
             if (abs(2.0 * t2 - nextBlockDepth) < nextBlockDepth && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
                 Hit hit;
                 hit.t = 999;
-                hit.texCoord = vec2((length(thingHitPos.xz) + 0.56) * 1.8 / 2, 0.10 - (thingHitPos.y) / 2);
+
+                vec2 horizontalFacingDirection = normalize(facingDirection.xz);
+                hit.texCoord = vec2((dot(thingHitPos.xz, vec2(-horizontalFacingDirection.y, horizontalFacingDirection.x)) + 0.5) / 6, 0.10 - thingHitPos.y / 2);
+
+                if (chunkOffset.y > 0.7) {
+                    vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(vec3(thingHitPos.x + 0.5, -3, thingHitPos.z - 1)))).rgb;
+                    if (3 - rawData.x - rawData.y - rawData.z > EPSILON) {
+                        hit.texCoord.x += 0.5;
+                    }
+                }
+
+                if (dot(movement, movement) > EPSILON) {
+                    hit.texCoord.x += (floor(fract(Time * 2) / 0.5) + 1) / 6;
+                }
 
                 vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
                 if (thingColor.x + thingColor.y + thingColor.z > 0) {

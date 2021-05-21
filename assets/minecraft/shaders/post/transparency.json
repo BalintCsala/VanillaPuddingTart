@@ -6,7 +6,8 @@
         "particles",
         "clouds",
         "weather",
-        "copy",
+        "previousFrame",
+        "previousData",
         "final"
     ],
     "passes": [
@@ -61,7 +62,11 @@
                 },
                 {
                     "name": "PreviousFrameSampler",
-                    "id": "copy"
+                    "id": "previousFrame"
+                },
+                {
+                    "name": "PreviousFrameDataSampler",
+                    "id": "previousData"
                 },
                 {
                     "name": "AtlasSampler",
@@ -82,7 +87,12 @@
         {
             "name": "blit",
             "intarget": "final",
-            "outtarget": "copy"
+            "outtarget": "previousFrame"
+        },
+        {
+            "name": "blit",
+            "intarget": "minecraft:main",
+            "outtarget": "previousData"
         },
         {
             "name": "blit",
