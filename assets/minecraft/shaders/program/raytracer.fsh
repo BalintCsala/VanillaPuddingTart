@@ -20,20 +20,9 @@ const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
 #define GAMMA_CORRECTION 2.2
 
 uniform sampler2D DiffuseSampler;
-uniform sampler2D DiffuseDepthSampler;
-uniform sampler2D TranslucentSampler;
-uniform sampler2D TranslucentDepthSampler;
-uniform sampler2D ItemEntitySampler;
-uniform sampler2D ItemEntityDepthSampler;
-uniform sampler2D ParticlesSampler;
-uniform sampler2D ParticlesDepthSampler;
-uniform sampler2D WeatherSampler;
-uniform sampler2D WeatherDepthSampler;
-uniform sampler2D CloudsSampler;
-uniform sampler2D CloudsDepthSampler;
 uniform sampler2D AtlasSampler;
 uniform sampler2D SteveSampler;
-//uniform sampler2D PreviousFrameSampler;
+
 uniform vec2 OutSize;
 uniform float Time;
 
@@ -48,7 +37,6 @@ in vec3 rayDir;
 in vec3 facingDirection;
 in float near;
 in float far;
-// in vec3 movement;
 in float steveCoordOffset;
 
 out vec4 fragColor;
@@ -305,108 +293,51 @@ vec3 pathTrace(Ray ray, out float depth) {
     return accumulated;
 }
 
-const int NUM_LAYERS = 5;
-
-vec4 color_layers[NUM_LAYERS];
-float depth_layers[NUM_LAYERS];
-int active_layers = 0;
-
-void try_insert(vec4 color, float depth) {
-    if (color.a == 0.0) {
-        return;
-    }
-    color.rgb = pow(color.rgb, vec3(GAMMA_CORRECTION));
-
-    color_layers[active_layers] = color;
-    depth_layers[active_layers] = depth;
-
-    int jj = active_layers++;
-    int ii = jj - 1;
-    while (jj > 0 && depth_layers[jj] > depth_layers[ii]) {
-        float depthTemp = depth_layers[ii];
-        depth_layers[ii] = depth_layers[jj];
-        depth_layers[jj] = depthTemp;
-
-        vec4 colorTemp = color_layers[ii];
-        color_layers[ii] = color_layers[jj];
-        color_layers[jj] = colorTemp;
-
-        jj = ii--;
-    }
-}
-
-vec3 blend(vec3 dst, vec4 src) {
-    return (dst * (1.0 - src.a)) + src.rgb;
-}
-
-float linearizeDepth(float depth) {
-    return (2.0 * near * far) / (far + near - depth * (far - near));
-}
-
 // Uchimura 2017, "HDR theory and practice"
 // Math: https://www.desmos.com/calculator/gslcdxvipg
 // Source: https://www.slideshare.net/nikuque/hdr-theory-and-practicce-jp
 vec3 uchimura(vec3 x, float P, float a, float m, float l, float c, float b) {
-  float l0 = ((P - m) * l) / a;
-  float L0 = m - m / a;
-  float L1 = m + (1.0 - m) / a;
-  float S0 = m + l0;
-  float S1 = m + a * l0;
-  float C2 = (a * P) / (P - S1);
-  float CP = -C2 / P;
-
-  vec3 w0 = vec3(1.0 - smoothstep(0.0, m, x));
-  vec3 w2 = vec3(step(m + l0, x));
-  vec3 w1 = vec3(1.0 - w0 - w2);
-
-  vec3 T = vec3(m * pow(x / m, vec3(c)) + b);
-  vec3 S = vec3(P - (P - S1) * exp(CP * (x - S0)));
-  vec3 L = vec3(m + a * (x - m));
-
-  return T * w0 + L * w1 + S * w2;
+    float l0 = ((P - m) * l) / a;
+    float L0 = m - m / a;
+    float L1 = m + (1.0 - m) / a;
+    float S0 = m + l0;
+    float S1 = m + a * l0;
+    float C2 = (a * P) / (P - S1);
+    float CP = -C2 / P;
+    vec3 w0 = vec3(1.0 - smoothstep(0.0, m, x));
+    vec3 w2 = vec3(step(m + l0, x));
+    vec3 w1 = vec3(1.0 - w0 - w2);
+    vec3 T = vec3(m * pow(x / m, vec3(c)) + b);
+    vec3 S = vec3(P - (P - S1) * exp(CP * (x - S0)));
+    vec3 L = vec3(m + a * (x - m));
+    return T * w0 + L * w1 + S * w2;
 }
 
 vec3 uchimura(vec3 x) {
-  const float P = 1.0;  // max display brightness
-  const float a = 1.0;  // contrast
-  const float m = 0.22; // linear section start
-  const float l = 0.4;  // linear section length
-  const float c = 1.33; // black
-  const float b = 0.0;  // pedestal
+    const float P = 1.0;  // max display brightness
+    const float a = 1.0;  // contrast
+    const float m = 0.22; // linear section start
+    const float l = 0.4;  // linear section length
+    const float c = 1.33; // black
+    const float b = 0.0;  // pedestal
 
-  return uchimura(x, P, a, m, l, c, b);
+    return uchimura(x, P, a, m, l, c, b);
 }
 
 void main() {
     // Set the pixel to black in case we don'steps hit anything.
     // Define the ray we need to trace. The origin is always 0, since the blockdata is relative to the player.
-    Ray ray = Ray(vec3(-1), 1 - chunkOffset, normalize(rayDir));
+    vec3 nRayDir = normalize(rayDir);
+    Ray ray = Ray(vec3(-1), 1 - chunkOffset, nRayDir);
 
     float depth;
     vec3 color = pathTrace(ray, depth);
-
     if (depth < 0) depth = far;
 
-    vec4 position = projMat * modelViewMat * vec4(normalize(ray.direction) * depth, 1);
-    float diffuseDepth = linearizeDepth(sqrt(position.z / position.w));
+    fragColor = vec4(pow(color, vec3(1.0 / GAMMA_CORRECTION)), 1);
 
-    color_layers[0] = vec4(color, 1);
-    depth_layers[0] = diffuseDepth;
-    active_layers = 1;
+    vec4 position = projMat * modelViewMat * vec4(nRayDir * (depth - near), 1);
+    float diffuseDepth = position.z / position.w;
+    gl_FragDepth = (diffuseDepth + 1) / 2;
 
-    try_insert(texture(TranslucentSampler, texCoord), linearizeDepth(texture(TranslucentDepthSampler, texCoord).r));
-    try_insert(texture(ItemEntitySampler, texCoord), linearizeDepth(texture(ItemEntityDepthSampler, texCoord).r));
-    try_insert(texture(CloudsSampler, texCoord), linearizeDepth(texture(CloudsDepthSampler, texCoord).r));
-    try_insert(texture(ParticlesSampler, texCoord), linearizeDepth(texture(ParticlesDepthSampler, texCoord).r));
-
-    vec3 texelAccum = color_layers[0].rgb;
-    for ( int ii = 1; ii < active_layers; ++ii ) {
-        texelAccum = blend(texelAccum, color_layers[ii]);
-    }
-
-    texelAccum = uchimura(texelAccum);
-    texelAccum = pow(texelAccum, vec3(1.0 / GAMMA_CORRECTION));
-
-    fragColor = vec4(texelAccum.rgb, 1);
-    //fragColor = vec4(mix(fragColor.rgb, texture(PreviousFrameSampler, texCoord).rgb, 0.95), 1);
 }

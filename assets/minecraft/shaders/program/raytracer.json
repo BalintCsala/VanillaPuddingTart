@@ -22,7 +22,6 @@
         { "name": "WeatherDepthSampler" },
         { "name": "AtlasSampler" },
         { "name": "SteveSampler" },
-        { "name": "PreviousFrameSampler" },
         { "name": "PreviousFrameDataSampler" }
     ],
     "uniforms": [
