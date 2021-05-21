@@ -214,7 +214,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
 
                 vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
                 if (thingColor.x + thingColor.y + thingColor.z > EPSILON) {
-                    hit.blockData.albedo = pow(thingColor, vec3(2.2));
+                    hit.blockData.albedo = pow(thingColor, vec3(GAMMA_CORRECTION));
                     return hit;
                 }
             }
