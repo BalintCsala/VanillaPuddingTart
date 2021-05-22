@@ -19,6 +19,10 @@
             "outtarget": "pathtraced",
             "auxtargets": [
                 {
+                    "name": "PreviousFrameDataSampler",
+                    "id": "previousData"
+                },
+                {
                     "name": "AtlasSampler",
                     "id": "atlas",
                     "width": 1,
