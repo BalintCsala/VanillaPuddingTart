@@ -336,8 +336,8 @@ void main() {
     vec3 color = pathTrace(ray, depth);
     if (depth < 0) depth = far;
 
+    color.rgb = uchimura(color.rgb);
     fragColor = vec4(pow(color, vec3(1.0 / GAMMA_CORRECTION)), 1);
-    fragColor.rgb = uchimura(fragColor.rgb);
 
     vec4 position = projMat * modelViewMat * vec4(nRayDir * (depth - near), 1);
     float diffuseDepth = position.z / position.w;
