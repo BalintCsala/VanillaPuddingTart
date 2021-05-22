@@ -24,9 +24,9 @@ out mat4 projInv;
 out vec3 chunkOffset;
 out vec3 rayDir;
 out vec3 facingDirection;
+out vec2 horizontalFacingDirection;
 out float near;
 out float far;
-// out vec3 movement;
 out float steveCoordOffset;
 
 vec2 pixelToTexCoord(vec2 pixel) {
@@ -109,6 +109,7 @@ void main() {
     projInv = inverse(projMat * modelViewMat);
     rayDir = (projInv * vec4(outPos.xy * (far - near), far + near, far - near)).xyz;
     facingDirection = (vec4(0, 0, -1, 0) * modelViewMat).xyz;
+    horizontalFacingDirection = normalize(facingDirection.xz);
 
     steveCoordOffset = 0.0;
     if (movement.x + movement.y + movement.z > EPSILON) {

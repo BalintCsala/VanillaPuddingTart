@@ -46,7 +46,7 @@ void main() {
     vec2 prevTexCoord = (prevClip.xy / prevClip.w + 1) / 2;
 
     // Throw away the previous data if the uvs fall outside of the screen area
-    if (any(greaterThan(abs(prevTexCoord - 0.5), vec2(0.5)))) {
+    if (any(greaterThan(abs(prevTexCoord - 0.5), vec2(0.5))) || currDepth > 1 - 1e-6) {
         return;
     }
 
@@ -54,7 +54,7 @@ void main() {
     float prevDepth = texture(PreviousFrameDepthSampler, prevTexCoord).r * 2 - 1;
     vec3 prevWorldPos = calculateWorldPos(prevDepth, prevTexCoord, prevProjMat, prevModelViewMat);
 
-    if (length(worldPos - prevWorldPos - prevPosition) < EPSILON) {
+    if (length(worldPos - prevWorldPos - prevPosition) < EPSILON * length(worldPos)) {
         // If the distance between the two fragments are similar, we use them for denoising
         fragColor.rgb = mix(fragColor.rgb, texture(PreviousFrameSampler, prevTexCoord).rgb, 0.9);
     }

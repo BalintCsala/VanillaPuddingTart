@@ -38,8 +38,6 @@ const vec4 ScreenPositions[] = vec4[](
 );
 
 void main() {
-	// Position of the block relative to the player.
-	vec3 relativePos = floor(Position + ChunkOffset);
 
 	// The index of the vertex in the face we're currently drawing.
 	int faceVertexID = imod(gl_VertexID, 4);
@@ -68,6 +66,9 @@ void main() {
 		vertexPosition = VertexPositions[5 * 4 + faceVertexID];
 		realTexCoord = vec2(-1, 1) * vertexPosition.xy + vec2(1, 0);
 	}
+	// Position of the block relative to the player.
+	vec3 relativePos = floor(round(Position + (vertexPosition * 2.0 - 1.0) * 0.49) + ChunkOffset);
+
 	vec3 worldPos = relativePos - vertexPosition;
 	// We calculate which pixel the block should be stored in
 	pixel = blockToPixel(worldPos);
