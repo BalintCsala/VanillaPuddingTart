@@ -66,6 +66,22 @@
             ]
         },
         {
+            "name": "copy_with_depth",
+            "intarget": "denoised",
+            "outtarget": "previousFrame",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "pathtraced:depth"
+                }
+            ]
+        },
+        {
+            "name": "blit",
+            "intarget": "minecraft:main",
+            "outtarget": "previousData"
+        },
+        {
             "name": "transparency",
             "intarget": "denoised",
             "outtarget": "combined",
@@ -115,16 +131,6 @@
                     "id": "weather:depth"
                 }
             ]
-        },
-        {
-            "name": "blit",
-            "intarget": "pathtraced",
-            "outtarget": "previousFrame"
-        },
-        {
-            "name": "blit",
-            "intarget": "minecraft:main",
-            "outtarget": "previousData"
         },
         {
             "name": "blit",

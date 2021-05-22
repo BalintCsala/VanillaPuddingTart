@@ -13,6 +13,15 @@ uniform sampler2D PreviousFrameDataSampler;
 
 out vec2 texCoord;
 out vec2 oneTexel;
+out mat4 currProjMat;
+out mat4 currModelViewMat;
+out mat4 prevProjMat;
+out mat4 prevModelViewMat;
+out mat4 projInv;
+out vec3 rayDir;
+out float near;
+out float far;
+out vec3 prevPosition;
 
 int decodeInt(vec3 ivec) {
     ivec *= 255.0;
@@ -34,33 +43,46 @@ void main() {
     texCoord = Position.xy / OutSize;
     oneTexel = 1.0 / OutSize;
 
-    /*
+
 
     vec2 start = getControl(0, OutSize);
     vec2 inc = vec2(2.0 / OutSize.x, 0.0);
 
-    // ProjMat constructed assuming no translation or rotation matrices applied (aka no view bobbing).
-    projMat = mat4(
-        tan(decodeFloat(texture(DiffuseSampler, start + 3.0 * inc).xyz)), decodeFloat(texture(DiffuseSampler, start + 6.0 * inc).xyz), 0.0, 0.0,
-        decodeFloat(texture(DiffuseSampler, start + 5.0 * inc).xyz), tan(decodeFloat(texture(DiffuseSampler, start + 4.0 * inc).xyz)), decodeFloat(texture(DiffuseSampler, start + 7.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 8.0 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 9.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 10.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 11.0 * inc).xyz),  decodeFloat(texture(DiffuseSampler, start + 12.0 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 13.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 14.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 15.0 * inc).xyz), 0.0
+    currProjMat = mat4(
+        tan(decodeFloat(texture(CurrentFrameDataSampler, start + 3.0 * inc).xyz)), decodeFloat(texture(CurrentFrameDataSampler, start + 6.0 * inc).xyz), 0.0, 0.0,
+        decodeFloat(texture(CurrentFrameDataSampler, start + 5.0 * inc).xyz), tan(decodeFloat(texture(CurrentFrameDataSampler, start + 4.0 * inc).xyz)), decodeFloat(texture(CurrentFrameDataSampler, start + 7.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 8.0 * inc).xyz),
+        decodeFloat(texture(CurrentFrameDataSampler, start + 9.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 10.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 11.0 * inc).xyz),  decodeFloat(texture(CurrentFrameDataSampler, start + 12.0 * inc).xyz),
+        decodeFloat(texture(CurrentFrameDataSampler, start + 13.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 14.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 15.0 * inc).xyz), 0.0
     );
 
-    modelViewMat = mat4(
-        decodeFloat(texture(DiffuseSampler, start + 16.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 17.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 18.0 * inc).xyz), 0.0,
-        decodeFloat(texture(DiffuseSampler, start + 19.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 20.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 21.0 * inc).xyz), 0.0,
-        decodeFloat(texture(DiffuseSampler, start + 22.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 23.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 24.0 * inc).xyz), 0.0,
+    currModelViewMat = mat4(
+        decodeFloat(texture(CurrentFrameDataSampler, start + 16.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 17.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 18.0 * inc).xyz), 0.0,
+        decodeFloat(texture(CurrentFrameDataSampler, start + 19.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 20.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 21.0 * inc).xyz), 0.0,
+        decodeFloat(texture(CurrentFrameDataSampler, start + 22.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 23.0 * inc).xyz), decodeFloat(texture(CurrentFrameDataSampler, start + 24.0 * inc).xyz), 0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+
+    prevProjMat = mat4(
+        tan(decodeFloat(texture(PreviousFrameDataSampler, start + 3.0 * inc).xyz)), decodeFloat(texture(PreviousFrameDataSampler, start + 6.0 * inc).xyz), 0.0, 0.0,
+        decodeFloat(texture(PreviousFrameDataSampler, start + 5.0 * inc).xyz), tan(decodeFloat(texture(PreviousFrameDataSampler, start + 4.0 * inc).xyz)), decodeFloat(texture(PreviousFrameDataSampler, start + 7.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 8.0 * inc).xyz),
+        decodeFloat(texture(PreviousFrameDataSampler, start + 9.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 10.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 11.0 * inc).xyz),  decodeFloat(texture(PreviousFrameDataSampler, start + 12.0 * inc).xyz),
+        decodeFloat(texture(PreviousFrameDataSampler, start + 13.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 14.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 15.0 * inc).xyz), 0.0
+    );
+
+    prevModelViewMat = mat4(
+        decodeFloat(texture(PreviousFrameDataSampler, start + 16.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 17.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 18.0 * inc).xyz), 0.0,
+        decodeFloat(texture(PreviousFrameDataSampler, start + 19.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 20.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 21.0 * inc).xyz), 0.0,
+        decodeFloat(texture(PreviousFrameDataSampler, start + 22.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 23.0 * inc).xyz), decodeFloat(texture(PreviousFrameDataSampler, start + 24.0 * inc).xyz), 0.0,
         0.0, 0.0, 0.0, 1.0
     );
 
     near = PROJNEAR;
-    far = projMat[3][2] * near / (projMat[3][2] + 2.0 * near);
+    far = currProjMat[3][2] * near / (currProjMat[3][2] + 2.0 * near);
 
-    chunkOffset = vec3(
-        decodeFloat(texture(DiffuseSampler, start + 100 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 101 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 102 * inc).xyz)
+    vec3 currChunkOffset = vec3(
+        decodeFloat(texture(CurrentFrameDataSampler, start + 100 * inc).xyz),
+        decodeFloat(texture(CurrentFrameDataSampler, start + 101 * inc).xyz),
+        decodeFloat(texture(CurrentFrameDataSampler, start + 102 * inc).xyz)
     );
 
     vec3 prevChunkOffset = vec3(
@@ -69,10 +91,11 @@ void main() {
         decodeFloat(texture(PreviousFrameDataSampler, start + 102 * inc).xyz)
     );
 
+    prevPosition = mod(currChunkOffset - prevChunkOffset + 0.5, 1) - 0.5;
 
-    float fov = atan(1 / projMat[1][1]);
+    float fov = atan(1 / currProjMat[1][1]);
 
-    projInv = inverse(projMat * modelViewMat);
+    projInv = inverse(currProjMat * currModelViewMat);
     rayDir = (projInv * vec4(outPos.xy * (far - near), far + near, far - near)).xyz;
-*/
+
 }
