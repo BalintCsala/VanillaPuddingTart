@@ -87,7 +87,7 @@ void main() {
     vec3 maxCol = vec3(0);
     for (float x = -1; x <= 1; x++) {
         for (float y = -1; y <= 1; y++) {
-            vec3 neighbor = texture(DiffuseSampler, texCoord + vec2(x, y)).rgb;
+            vec3 neighbor = texture(DiffuseSampler, texCoord + vec2(x, y) * oneTexel).rgb;
             minCol = min(minCol, neighbor);
             maxCol = max(maxCol, neighbor);
         }
@@ -96,5 +96,5 @@ void main() {
     // Then we'll clip the previous color into the clip space
     vec3 clippedPrevColor = clipColor(minCol, maxCol, prevColor);
     // And use the clipped value for aliasing
-    fragColor.rgb = mix(fragColor.rgb, clippedPrevColor, 0.5);
+    fragColor.rgb = mix(fragColor.rgb, clippedPrevColor, 0.9);
 }
