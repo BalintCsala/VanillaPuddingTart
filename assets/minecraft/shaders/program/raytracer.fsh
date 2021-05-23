@@ -1,13 +1,15 @@
 #version 150
 
+#define GAMMA_CORRECTION 2.2
+
 const float PI = 3.141592654;
 const float EPSILON = 0.00001;
 const int MAX_STEPS = 100;
 const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
 const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
 const int MAX_REFLECTION_BOUNCES = 10;
-const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
-const vec3 SKY_COLOR = 2.0 * vec3(0.2, 0.35, 0.5);
+const vec3 SUN_COLOR = pow(1.0 * vec3(1.0, 0.95, 0.8), vec3(GAMMA_CORRECTION));
+const vec3 SKY_COLOR = pow(2.0 * vec3(0.2, 0.35, 0.5), vec3(GAMMA_CORRECTION));
 const float SUN_ANGULAR_SIZE = 0.01;
 const float MAX_EMISSION_STRENGTH = 5;
 // I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
@@ -16,8 +18,6 @@ const float MAX_EMISSION_STRENGTH = 5;
 const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
 const float LAYER_SIZE = 88;
 const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
-
-#define GAMMA_CORRECTION 2.2
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D AtlasSampler;
@@ -237,7 +237,7 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
         sunlightHit = trace(sunRay, MAX_STEPS, true);
 
         accumulated += hit.blockData.emission.rgb * MAX_EMISSION_STRENGTH * hit.blockData.emission.a * weight;
-        accumulated += sqrt(NdotL) * step(sunlightHit.traceLength, EPSILON) * pow(SUN_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+        accumulated += sqrt(NdotL) * step(sunlightHit.traceLength, EPSILON) * SUN_COLOR * weight;
 
         if (hit.traceLength < EPSILON) {
             // Didn't hit a block, we'll draw the sky
@@ -261,7 +261,7 @@ vec3 pathTrace(Ray ray, out float depth) {
         // We didn't hit anything
         depth = far;
         float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
-        return sunFactor * pow(SUN_COLOR, vec3(GAMMA_CORRECTION)) + (1 - sunFactor) * pow(SKY_COLOR, vec3(GAMMA_CORRECTION));
+        return sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR;
     }
 
     // Global Illumination
@@ -283,8 +283,7 @@ vec3 pathTrace(Ray ray, out float depth) {
         if (hit.traceLength < EPSILON) {
             // We didn't hit anything
             float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
-            accumulated += (sunFactor * pow(SUN_COLOR, vec3(GAMMA_CORRECTION)) +
-                            (1 - sunFactor) * pow(SKY_COLOR, vec3(GAMMA_CORRECTION))) * weight;
+            accumulated += (sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR) * weight;
             break;
         }
         // Global Illumination in reflecton
