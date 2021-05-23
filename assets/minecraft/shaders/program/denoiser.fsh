@@ -68,7 +68,7 @@ void main() {
     vec2 prevTexCoord = (prevClip.xy / prevClip.w + 1) / 2;
 
     // Throw away the previous data if the uvs fall outside of the screen area
-    if (any(greaterThan(abs(prevTexCoord - 0.5), vec2(0.5))) || currDepth > 1 - 1e-6) {
+    if (any(greaterThan(abs(prevTexCoord - 0.5), vec2(0.5)))) {
         return;
     }
 
