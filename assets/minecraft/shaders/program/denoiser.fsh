@@ -1,7 +1,5 @@
 #version 150
 
-const float EPSILON = 0.01;
-
 in vec2 texCoord;
 in vec2 oneTexel;
 in mat4 currProjMat;
@@ -28,9 +26,33 @@ vec3 calculateWorldPos(float depth, vec2 texCoord, mat4 projMat, mat4 modelViewM
     return (inverse(modelViewMat) * viewSpace).xyz;
 }
 
+// From a presentation given by Lasse Jon Fuglsang Pedersen titled "Temporal Reprojection Anti-Aliasing in INSIDE"
+// https://www.youtube.com/watch?v=2XXS5UyNjjU&t=434s
+vec3 clipColor(vec3 aabbMin, vec3 aabbMax, vec3 prevColor) {
+    // Center of the clip space
+    vec3 pClip = (aabbMax + aabbMin) / 2;
+    // Size of the clip space
+    vec3 eClip = (aabbMax - aabbMin) / 2;
+
+    // The relative coordinates of the previous color in the clip space
+    vec3 vClip = prevColor - pClip;
+    // Normalized clip space coordintes
+    vec3 vUnit = vClip / eClip;
+    // The distance of the previous color from the center of the clip space in each axis in the normalized clip space
+    vec3 aUnit = abs(vUnit);
+    // The divisor is the largest distance from the center along each axis
+    float divisor = max(aUnit.x, max(aUnit.y, aUnit.z));
+    if (divisor > 1) {
+        // If the divisor is larger, than 1, that means that the previous color is outside of the clip space
+        // If we divide by divisor, we'll put it into clip space
+        return pClip + vClip / divisor;
+    }
+    // Otherwise it's already clipped
+    return prevColor;
+}
+
 void main() {
     vec3 currColor = texture(DiffuseSampler, texCoord).rgb;
-    vec3 prevColor = texture(PreviousFrameSampler, texCoord).rgb;
     fragColor = vec4(currColor, 1);
 
     // Reprojection based aliasing
@@ -54,8 +76,25 @@ void main() {
     float prevDepth = texture(PreviousFrameDepthSampler, prevTexCoord).r * 2 - 1;
     vec3 prevWorldPos = calculateWorldPos(prevDepth, prevTexCoord, prevProjMat, prevModelViewMat);
 
-    if (length(worldPos - prevWorldPos - prevPosition) < EPSILON * length(worldPos)) {
-        // If the distance between the two fragments are similar, we use them for denoising
-        fragColor.rgb = mix(fragColor.rgb, texture(PreviousFrameSampler, prevTexCoord).rgb, 0.9);
+    if (length(worldPos - prevWorldPos - prevPosition) > 5) {
+        return;
     }
+
+    // Temporal antialiasing from same talk mentioned earlier
+    vec3 prevColor = texture(PreviousFrameSampler, prevTexCoord).rgb;
+    // We'll calculate the color space from the neighbouring texels
+    vec3 minCol = vec3(1);
+    vec3 maxCol = vec3(0);
+    for (float x = -1; x <= 1; x++) {
+        for (float y = -1; y <= 1; y++) {
+            vec3 neighbor = texture(DiffuseSampler, texCoord + vec2(x, y)).rgb;
+            minCol = min(minCol, neighbor);
+            maxCol = max(maxCol, neighbor);
+        }
+    }
+
+    // Then we'll clip the previous color into the clip space
+    vec3 clippedPrevColor = clipColor(minCol, maxCol, prevColor);
+    // And use the clipped value for aliasing
+    fragColor.rgb = mix(fragColor.rgb, clippedPrevColor, 0.5);
 }
