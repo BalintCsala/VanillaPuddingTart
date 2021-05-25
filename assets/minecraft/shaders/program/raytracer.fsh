@@ -1,6 +1,7 @@
 #version 150
 
 const float PI = 3.141592654;
+const float PHI = 1.618033988749894848204586;
 const float EPSILON = 0.00001;
 const int MAX_STEPS = 100;
 const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
@@ -22,6 +23,8 @@ const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
 uniform sampler2D DiffuseSampler;
 uniform sampler2D AtlasSampler;
 uniform sampler2D SteveSampler;
+// Blue noise from http://momentsingraphics.de/BlueNoise.html
+uniform sampler2D NoiseSampler;
 
 uniform vec2 OutSize;
 uniform float Time;
@@ -136,9 +139,14 @@ vec3 hash(uvec3 x) {
     return vec3(x) * (1.0 / float(0xffffffffU));
 }
 
+vec3 noise(float seed) {
+    uvec3 p = uvec3(gl_FragCoord.xy, (Time * 32.46432 + seed) * 60);
+    vec3 offset = hash(p) * PHI;
+    return mod(texture(NoiseSampler, gl_FragCoord.xy / textureSize(NoiseSampler, 0)).rgb + offset, 1);
+}
+
 vec3 randomDirection(vec2 coords, vec3 normal, float seed, float deviateFactor) {
-    uvec3 p = uvec3(coords * 5000, (Time * 32.46432 + seed) * 60);
-    vec3 v = hash(p);
+    vec3 v = noise(seed);
     float angle = 2 * PI * v.x;
     float u = 2 * v.y - 1;
 

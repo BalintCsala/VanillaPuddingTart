@@ -76,10 +76,6 @@ void main() {
     float prevDepth = texture(PreviousFrameDepthSampler, prevTexCoord).r * 2 - 1;
     vec3 prevWorldPos = calculateWorldPos(prevDepth, prevTexCoord, prevProjMat, prevModelViewMat);
 
-    if (length(worldPos - prevWorldPos - prevPosition) > 5) {
-        return;
-    }
-
     // Temporal antialiasing from same talk mentioned earlier
     vec3 prevColor = texture(PreviousFrameSampler, prevTexCoord).rgb;
     // We'll calculate the color space from the neighbouring texels
@@ -87,7 +83,7 @@ void main() {
     vec3 maxCol = vec3(0);
     for (float x = -1; x <= 1; x++) {
         for (float y = -1; y <= 1; y++) {
-            vec3 neighbor = texture(DiffuseSampler, texCoord + vec2(x, y)).rgb;
+            vec3 neighbor = texture(DiffuseSampler, texCoord + vec2(x, y) * oneTexel).rgb;
             minCol = min(minCol, neighbor);
             maxCol = max(maxCol, neighbor);
         }
