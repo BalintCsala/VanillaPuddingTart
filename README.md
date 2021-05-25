@@ -1,8 +1,8 @@
-# <ins>Before you try it out, read this!</ins>
+# ❗ <ins>Before you try it out, read this!</ins> ❗
 
-**Slight epilepsy warning**, the shader generates a lot of noise (this is by design, imagine a very colorful TV static). Don't try it out if you are prone to seizures. This will be remedied in a future patch.
+**Slight epilepsy warning**, the shader generates a lot of noise (this is by design, imagine a very colorful TV static). Don't try it out if you are prone to seizures. This will be remedied in a future patch. (This has been solved somewhat, still not ideal, but much less static-like)
 
-This shader is WIP, therefore it lacks many features, including complete support for 90% of the blocks. If you still want to try it out, do it in a void world, but don't expect a playable resource pack.
+This shader is WIP, therefore it lacks many features, including complete support for 90% of the blocks. **If you still want to try it out, do it in a void world**, but don't expect a playable resource pack.
 
 # Path tracing 1.17 shader
 
@@ -12,11 +12,11 @@ This shader is WIP, therefore it lacks many features, including complete support
 - Shadows
 - Reflections
 - Emission (= light sources work as they should)
-- Configurable (kinda) IOR and metallicity factors
+- Configurable F0, metallicity and roughness factors
 
 ## How to install
 
-Usually works on the current snapshot, but make sure to check the last commit date! If it doesn't work on the latest and the date is before the release date of the snapshot, then I probably haven't gotten around to updating it yet.
+Usually works on the current snapshot (at the time of writing this, it's 21w20a), but make sure to check the last commit date! If it doesn't work on the latest and the date is before the release date of the snapshot, then I probably haven't gotten around to updating it yet. If it works, but the textures are messed up, that means that it's the wrong snapshot.
 
 This also only works if the resolution of your monitors exceeds or matches 1024x768 in both directions
 
@@ -30,13 +30,13 @@ This also only works if the resolution of your monitors exceeds or matches 1024x
 
 > It's dangerous to go alone! Take this.
 
-The current view distance is pretty bad (44 blocks in the 3 cardinal directions). This is sadly the limit of the 1024x705 (windowed 736p) minimum resolution I chose.
+The current view distance is pretty bad (44 blocks in the 3 cardinal directions). This is sadly the limit of the 1024x705 (windowed 768p) minimum resolution I chose.
 
-I can't increase this without removing support for a bunch of people, so if you have a larger screen (which you most likely do) and want better view distance, you'll need to edit the code a bit.
+I can't increase this without removing support for a bunch of people, so if you have a larger screen (which you most likely do) and want better view distance (which you also likely want), you'll need to edit the code a bit.
 
-> Whenever I mention the resolution in the following paragraph, I mean the actual resolution the game is running at. This will only match the monitor resolution when the game is in full screen. You can find the actual resolution on the F3 debug screen in-game.
+> Whenever I mention the resolution in the following paragraph, I mean the actual resolution the game is running at. This will only match the monitor resolution when the game is in full screen. You can find the actual resolution on the F3 debug screen in-game on the right side.
 
-The maximum viewable area width (2 x view distance) `v` can be calculated using the following equation, where Sx and Sy is the screen width and height in pixels and `floor` gives you the integer part of the decimal (`floor(5.6) = 5`):
+The maximum viewable area width (2 x view distance) `v` can be calculated using the following equation, where Sx and Sy are the screen width and height in pixels and `floor` gives you the integer part of a decimal (`floor(5.6) = 5`):
 
 ```
 floor(Sx / v) * floor(Sy / v) >= v
@@ -46,6 +46,12 @@ A rough approximation can be found quickly by multiplying the width and height o
 
 For instance:
 A 4k screen (3840x2160) has an area of 8294400 pixels, so the theoretical max view area width is 202, but the largest value that satisfies the inequality is 196, therefore the actual value is 196.
+
+```
+floor(3840 / 196) = 19
+floor(2160 / 196) = 11
+11 * 19 = 209 >= 196
+```
 
 Some values for common screen resolutions (all of these are for fullscreen):
 
@@ -59,13 +65,13 @@ Some values for common screen resolutions (all of these are for fullscreen):
 
 Once you have `v`, you need to edit some files. Go into the resource pack folder and find the files
 
-- assets/minecraft/shaders/include/utils.glsl
-- assets/minecraft/shaders/program/raytracer.fsh
+- `assets/minecraft/shaders/include/utils.glsl`
+- `assets/minecraft/shaders/program/raytracer.fsh`
 
-And edit the following 3 lines in both files according to v:
+And edit the following 3 lines in **both** files according to v:
 
 ```glsl
-const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);  // This should be your screen resolution you used earlier
+const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);  // This should be the screen resolution you used earlier
 const float LAYER_SIZE = 88;                            // This should be "v"
 const vec2 STORAGE_DIMENSIONS = vec2(11, 8);            // The first value should be floor(screen width / v), the second value should be floor(screen height / v)
 ```
@@ -73,7 +79,7 @@ const vec2 STORAGE_DIMENSIONS = vec2(11, 8);            // The first value shoul
 You should also edit the following line in raytracer.fsh:
 
 ```glsl
-const int MAX_STEPS = 100; // Set this to roughly 1.5-2 times "v"
+const int MAX_STEPS = 100; // Set this to roughly 2-3 times "v"
 ```
 
 The shader should work at this point with the increased view distance.
@@ -86,21 +92,21 @@ A single atlas controls the material properties for all blocks. This can be foun
 
 The texture is divided into 4 parts:
 
-- The top left corner is the normal texture atlas (albedo if you will)
-- The top right corner is emission information. Transparent is no emission (you need to lay the atlas on top of this temporarily, if you want to edit it).
-- The bottom left corner is F0 (amount of refraction when looking at a surface directly, essentially reflection color). Generally should be gray for non-metallic (dielectric) materials and colored for metals.
-- The bottom right corner is a combined metallicity (red channel) and roughness (green channel) map. In the future this will also hold other miscellaneous values, like roughness.
+- The top left corner is the normal texture atlas (albedo if you will).
+- The top right corner is emission information. Transparent is no emission, strength of a light is based on the alpha channel (you need to lay the atlas on top of this temporarily, if you want to edit it).
+- The bottom left corner is F0 (amount of refraction when looking at a surface directly, essentially reflection color). Generally should be gray for non-metallic (dielectric) materials and colored for metals. Use schlick's approximation to calculate it from refractive index (`F0 = (n-1)^2 / (n + 1)^2`, where `n` is the refractive index).
+- The bottom right corner is a combined metallicity (red channel) and roughness (green channel) map. In the future this will also hold other miscellaneous values if needed.
 
 ## Pro mode
 
 > Only do this if you know what you are doing. Good rule of thumb: If you don't know if you'll know what you will be doing, you won't.
 
-A couple of values can be configured in assets/minecraft/shaders/program/raytracer.fsh for a better effect. Each of these has a huge impact on performance, so make sure you don't burn out your graphcs card.
+A couple of values can be configured in `assets/minecraft/shaders/program/raytracer.fsh` for a better effect. Each of these has a huge impact on performance, so make sure you don't burn out your graphcs card.
 
 A description of each of these values is included in the following code block:
 
 ```glsl
-// This determines how many steps (approx. blocks) the GI ray will do to check bounce lighting (complexity: O(N))
+// This determines how many steps (approx. blocks) the GI ray will go through to check bounce lighting (complexity: O(N))
 const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
 // This will determine how many bounces a GI ray is allowed to do to calculate the light level at a pixel (complexity: O(N^2))
 const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
