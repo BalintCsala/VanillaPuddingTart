@@ -241,7 +241,7 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
 
         if (hit.traceLength < EPSILON) {
             // Didn't hit a block, we'll draw the sky
-            accumulated += pow(SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+            accumulated += SKY_COLOR * weight;
             break;
         }
     }
