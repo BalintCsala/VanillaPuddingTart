@@ -1,5 +1,7 @@
 #version 150
 
+#define GAMMA_CORRECTION 2.2
+
 const float PI = 3.141592654;
 const float PHI = 1.618033988749894848204586;
 const float EPSILON = 0.00001;
@@ -7,8 +9,8 @@ const int MAX_STEPS = 100;
 const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
 const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
 const int MAX_REFLECTION_BOUNCES = 10;
-const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
-const vec3 SKY_COLOR = 2.0 * vec3(0.2, 0.35, 0.5);
+const vec3 SUN_COLOR = pow(1.0 * vec3(1.0, 0.95, 0.8), vec3(GAMMA_CORRECTION));
+const vec3 SKY_COLOR = pow(2.0 * vec3(0.2, 0.35, 0.5), vec3(GAMMA_CORRECTION));
 const float SUN_ANGULAR_SIZE = 0.01;
 const float MAX_EMISSION_STRENGTH = 5;
 // I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
@@ -17,8 +19,6 @@ const float MAX_EMISSION_STRENGTH = 5;
 const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
 const float LAYER_SIZE = 88;
 const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
-
-#define GAMMA_CORRECTION 2.2
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D AtlasSampler;
@@ -38,6 +38,7 @@ in mat4 projInv;
 in vec3 chunkOffset;
 in vec3 rayDir;
 in vec3 facingDirection;
+in vec2 horizontalFacingDirection;
 in float near;
 in float far;
 in float steveCoordOffset;
@@ -205,7 +206,6 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
                 Hit hit;
                 hit.traceLength = 999;
 
-                vec2 horizontalFacingDirection = normalize(facingDirection.xz);
                 hit.texCoord = vec2((dot(thingHitPos.xz, vec2(-horizontalFacingDirection.y, horizontalFacingDirection.x)) + 0.5) / 6 + steveCoordOffset,
                                     0.10 - thingHitPos.y / 2);
 
@@ -245,11 +245,11 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
         sunlightHit = trace(sunRay, MAX_STEPS, true);
 
         accumulated += hit.blockData.emission.rgb * MAX_EMISSION_STRENGTH * hit.blockData.emission.a * weight;
-        accumulated += sqrt(NdotL) * step(sunlightHit.traceLength, EPSILON) * pow(SUN_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+        accumulated += sqrt(NdotL) * step(sunlightHit.traceLength, EPSILON) * SUN_COLOR * weight;
 
         if (hit.traceLength < EPSILON) {
             // Didn't hit a block, we'll draw the sky
-            accumulated += pow(SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+            accumulated += SKY_COLOR * weight;
             break;
         }
     }
@@ -269,7 +269,7 @@ vec3 pathTrace(Ray ray, out float depth) {
         // We didn't hit anything
         depth = far;
         float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
-        return pow(sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+        return sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR;
     }
 
     // Global Illumination
@@ -290,7 +290,8 @@ vec3 pathTrace(Ray ray, out float depth) {
 
         if (hit.traceLength < EPSILON) {
             // We didn't hit anything
-            accumulated += pow(SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+            float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
+            accumulated += (sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR) * weight;
             break;
         }
         // Global Illumination in reflecton
@@ -342,6 +343,7 @@ void main() {
     vec3 color = pathTrace(ray, depth);
     if (depth < 0) depth = far;
 
+    color.rgb = uchimura(color.rgb);
     fragColor = vec4(pow(color, vec3(1.0 / GAMMA_CORRECTION)), 1);
 
     vec4 position = projMat * modelViewMat * vec4(nRayDir * (depth - near), 1);
