@@ -68,12 +68,11 @@ Once you have `v`, you need to edit some files. Go into the resource pack folder
 - `assets/minecraft/shaders/include/utils.glsl`
 - `assets/minecraft/shaders/program/raytracer.fsh`
 
-And edit the following 3 lines in **both** files according to v:
+And edit the following 2 lines in **both** files according to v (These should be near the top):
 
 ```glsl
 const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);  // This should be the screen resolution you used earlier
 const float LAYER_SIZE = 88;                            // This should be "v"
-const vec2 STORAGE_DIMENSIONS = vec2(11, 8);            // The first value should be floor(screen width / v), the second value should be floor(screen height / v)
 ```
 
 You should also edit the following line in raytracer.fsh:

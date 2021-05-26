@@ -1,17 +1,18 @@
 #version 150
 
+// I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
+// This should just barely fit 8, 88 deep layers (8 * 88 + 1 control line = 705)
+// I want to keep the stored layers square, therefore I only use 88 * 11 = 968 pixels horizontally
+const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
+const float LAYER_SIZE = 88;
+
 const float EPSILON = 0.01;
 const float FPRECISION = 4000000.0;
 const float NUMCONTROLS = 200;
 const float THRESH = 0.5;
 const float PROJNEAR = 0.05;
 
-// I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
-// This should just barely fit 8, 88 deep layers (8 * 88 + 1 control line = 705)
-// I want to keep the stored layers square, therefore I only use 88 * 11 = 968 pixels horizontally
-const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
-const float LAYER_SIZE = 88;
-const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
+const vec2 STORAGE_DIMENSIONS = floor(VOXEL_STORAGE_RESOLUTION / LAYER_SIZE);
 
 int imod(int val, int m) {
     return val - val / m * m;

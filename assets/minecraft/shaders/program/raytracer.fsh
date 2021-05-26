@@ -1,24 +1,26 @@
 #version 150
 
-const float PI = 3.141592654;
-const float PHI = 1.618033988749894848204586;
-const float EPSILON = 0.00001;
-const int MAX_STEPS = 100;
-const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
-const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
-const int MAX_REFLECTION_BOUNCES = 10;
-const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
-const vec3 SKY_COLOR = 2.0 * vec3(0.2, 0.35, 0.5);
-const float SUN_ANGULAR_SIZE = 0.01;
-const float MAX_EMISSION_STRENGTH = 5;
 // I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
 // This should just barely fit 8, 88 deep layers vertically (8 * 88 + 1 control line = 705)
 // I want to keep the stored layers square, therefore I only use 88 * 11 = 968 pixels horizontally
 const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
 const float LAYER_SIZE = 88;
-const vec2 STORAGE_DIMENSIONS = vec2(11, 8);
 
-#define GAMMA_CORRECTION 2.2
+const float PI = 3.141592654;
+const float PHI = 1.618033988749894848204586;
+const float EPSILON = 0.00001;
+
+const float GAMMA_CORRECTION = 2.2;
+const int MAX_STEPS = 100;
+const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
+const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
+const int MAX_REFLECTION_BOUNCES = 10;
+const vec3 SUN_COLOR = pow(1.0 * vec3(1.0, 0.95, 0.8), vec3(GAMMA_CORRECTION));
+const vec3 SKY_COLOR = pow(2.0 * vec3(0.2, 0.35, 0.5), vec3(GAMMA_CORRECTION));
+const float SUN_ANGULAR_SIZE = 0.01;
+const float MAX_EMISSION_STRENGTH = 5;
+
+const vec2 STORAGE_DIMENSIONS = floor(VOXEL_STORAGE_RESOLUTION / LAYER_SIZE);
 
 uniform sampler2D DiffuseSampler;
 uniform sampler2D AtlasSampler;
@@ -30,11 +32,9 @@ uniform vec2 OutSize;
 uniform float Time;
 
 in vec2 texCoord;
-in vec2 oneTexel;
 in vec3 sunDir;
 in mat4 projMat;
 in mat4 modelViewMat;
-in mat4 projInv;
 in vec3 chunkOffset;
 in vec3 rayDir;
 in vec3 facingDirection;
@@ -70,15 +70,6 @@ struct Hit {
     vec3 normal;
     BlockData blockData;
     vec2 texCoord;
-};
-
-struct BounceHit {
-    float traceLength;
-    vec3 block;
-    vec3 blockPosition;
-    vec3 color;
-    vec3 normal;
-    vec3 finalDirection;
 };
 
 // No moj_import here
@@ -120,10 +111,6 @@ BlockData getBlock(vec3 rawData, vec2 texCoord) {
     return blockData;
 }
 
-vec2 getControl(int index, vec2 screenSize) {
-    return vec2(floor(screenSize.x / 2.0) + float(index) * 2.0 + 0.5, 0.5) / screenSize;
-}
-
 float intersectPlane(vec3 origin, vec3 direction, vec3 normal) {
     return dot(-origin, normal) / dot(direction, normal);
 }
@@ -158,7 +145,7 @@ vec3 fresnel(vec3 F0, float cosTheta) {
     return F0 + (1 - F0) * pow(max(1 - cosTheta, 0), 5);
 }
 
-Hit trace(Ray ray, int maxSteps, bool reflected) {
+Hit trace(Ray ray, int maxSteps) {
     float rayLength = 0;
     vec3 signedDirection = sign(ray.direction);
     vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
@@ -195,7 +182,7 @@ Hit trace(Ray ray, int maxSteps, bool reflected) {
                                 (vec2(1.0 - ray.blockPosition.z, ray.blockPosition.z) - 0.5) * vec2(normal.x + normal.y), nextBlock.xy) + vec2(0.5);
             BlockData blockData = getBlock(rawData, texCoord);
             return Hit(rayLength, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
-        } else if (reflected && distance(ray.currentBlock, vec3(-1.0, -2.0, -1.0)) < 1.8 ) {
+        } else if (distance(ray.currentBlock, vec3(-1.0, -2.0, -1.0)) < 1.8) {
             vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
             float steveDistance = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, EPSILON, facingDirection.z));
             vec3 thingHitPos = rayActualPos + ray.direction * steveDistance;
@@ -241,15 +228,15 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
         sunRay = Ray(hit.block, hit.blockPosition, sunDirection);
 
         // Path tracing
-        hit = trace(ray, MAX_STEPS, true);
-        sunlightHit = trace(sunRay, MAX_STEPS, true);
+        hit = trace(ray, MAX_STEPS);
+        sunlightHit = trace(sunRay, MAX_STEPS);
 
         accumulated += hit.blockData.emission.rgb * MAX_EMISSION_STRENGTH * hit.blockData.emission.a * weight;
-        accumulated += sqrt(NdotL) * step(sunlightHit.traceLength, EPSILON) * pow(SUN_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+        accumulated += sqrt(NdotL) * step(sunlightHit.traceLength, EPSILON) * SUN_COLOR * weight;
 
         if (hit.traceLength < EPSILON) {
             // Didn't hit a block, we'll draw the sky
-            accumulated += pow(SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+            accumulated += SKY_COLOR * weight;
             break;
         }
     }
@@ -262,14 +249,14 @@ vec3 pathTrace(Ray ray, out float depth) {
     vec3 weight = vec3(1.0);
 
     // Get direct world position
-    Hit hit = trace(ray, MAX_STEPS, false);
+    Hit hit = trace(ray, MAX_STEPS);
     depth = hit.traceLength + near;
 
     if (hit.traceLength < EPSILON) {
         // We didn't hit anything
         depth = far;
         float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
-        return pow(sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+        return sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR * weight;
     }
 
     // Global Illumination
@@ -286,11 +273,11 @@ vec3 pathTrace(Ray ray, out float depth) {
         vec3 direction = reflect(ray.direction, hit.normal);
         direction = randomDirection(texCoord, direction, float(steps) * 63.46103, hit.blockData.roughness);
         ray = Ray(hit.block, hit.blockPosition, direction);
-        hit = trace(ray, MAX_STEPS, true);
+        hit = trace(ray, MAX_STEPS);
 
         if (hit.traceLength < EPSILON) {
             // We didn't hit anything
-            accumulated += pow(SKY_COLOR, vec3(GAMMA_CORRECTION)) * weight;
+            accumulated += SKY_COLOR * weight;
             break;
         }
         // Global Illumination in reflecton
@@ -347,5 +334,4 @@ void main() {
     vec4 position = projMat * modelViewMat * vec4(nRayDir * (depth - near), 1);
     float diffuseDepth = position.z / position.w;
     gl_FragDepth = (diffuseDepth + 1) / 2;
-
 }
