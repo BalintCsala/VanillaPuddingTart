@@ -38,6 +38,7 @@ in mat4 modelViewMat;
 in vec3 chunkOffset;
 in vec3 rayDir;
 in vec3 facingDirection;
+in vec2 horizontalFacingDirection;
 in float near;
 in float far;
 in float steveCoordOffset;
@@ -192,7 +193,6 @@ Hit trace(Ray ray, int maxSteps) {
                 Hit hit;
                 hit.traceLength = 999;
 
-                vec2 horizontalFacingDirection = normalize(facingDirection.xz);
                 hit.texCoord = vec2((dot(thingHitPos.xz, vec2(-horizontalFacingDirection.y, horizontalFacingDirection.x)) + 0.5) / 6 + steveCoordOffset,
                                     0.10 - thingHitPos.y / 2);
 
@@ -278,6 +278,8 @@ vec3 pathTrace(Ray ray, out float depth) {
         if (hit.traceLength < EPSILON) {
             // We didn't hit anything
             accumulated += SKY_COLOR * weight;
+            float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
+            accumulated += (sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR) * weight;
             break;
         }
         // Global Illumination in reflecton
@@ -329,6 +331,7 @@ void main() {
     vec3 color = pathTrace(ray, depth);
     if (depth < 0) depth = far;
 
+    color.rgb = uchimura(color.rgb);
     fragColor = vec4(pow(color, vec3(1.0 / GAMMA_CORRECTION)), 1);
 
     vec4 position = projMat * modelViewMat * vec4(nRayDir * (depth - near), 1);
