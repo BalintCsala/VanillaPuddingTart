@@ -92,5 +92,5 @@ void main() {
     // Then we'll clip the previous color into the clip space
     vec3 clippedPrevColor = clipColor(minCol, maxCol, prevColor);
     // And use the clipped value for aliasing
-    fragColor.rgb = mix(fragColor.rgb, clippedPrevColor, 0.9);
+    fragColor.rgb = mix(fragColor.rgb, clippedPrevColor, 0.5);
 }

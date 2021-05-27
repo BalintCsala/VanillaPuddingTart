@@ -16,7 +16,7 @@ This shader is WIP, therefore it lacks many features, including complete support
 
 ## How to install
 
-Usually works on the current snapshot (at the time of writing this, it's 21w20a), but make sure to check the last commit date! If it doesn't work on the latest and the date is before the release date of the snapshot, then I probably haven't gotten around to updating it yet. If it works, but the textures are messed up, that means that it's the wrong snapshot.
+Usually works on the current snapshot (at the time of writing this, it's 1.17 pre-release 1), but make sure to check the last commit date! If it doesn't work on the latest and the date is before the release date of the snapshot, then I probably haven't gotten around to updating it yet. If it works, but the textures are messed up, that means that it's the wrong snapshot.
 
 This also only works if the resolution of your monitors exceeds or matches 1024x768 in both directions
 
