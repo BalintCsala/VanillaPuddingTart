@@ -2,9 +2,17 @@
 
 **Slight epilepsy warning**, the shader generates a lot of noise (this is by design, imagine a very colorful TV static). Don't try it out if you are prone to seizures. This will be remedied in a future patch. (This has been solved somewhat, still not ideal, but much less static-like)
 
-This shader is WIP, therefore it lacks many features, including complete support for 90% of the blocks. **If you still want to try it out, do it in a void world**, but don't expect a playable resource pack.
+This shader is WIP, therefore it lacks many features, including complete support for some of the blocks. ~~If you still want to try it out, do it in a void world~~ It's not required to play in a void world anymore, but it's still recommended, since entities break it easily.
 
 # Path tracing 1.17 shader
+
+## Notes on the latest version
+
+I'm currently implementing more blocks into the shader. I replaced the in-game atlas with a custom one (vanilla textures still). Most blocks _work_, but not completely (All blocks are cube-shaped and most of them have the same textures on all sides). The only exceptions are vertical column blocks (e.g. vertical logs) and grass blocks.
+
+The texture atlas will be generated using a separate (open source) program, so custom resource packs will be supported in the future, albeit not without some small work.
+
+Due to the change in the atlas, some features aren't used in this version (emission, reflections, roughness, etc.). They are still supported and can easily be enabled by editing the atlas manually, but no blocks do this by default. The atlas generator will be released once it has support for these options.
 
 ## Features
 

@@ -6,6 +6,10 @@
 const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
 const float LAYER_SIZE = 88;
 
+// Block types
+#define CUBE_COLUMN 1u
+#define GRASS_BLOCK 117u
+
 const float PI = 3.141592654;
 const float PHI = 1.618033988749894848204586;
 const float EPSILON = 0.00001;
@@ -95,11 +99,30 @@ int decodeInt(vec3 ivec) {
     return s * (int(ivec.r) + int(ivec.g) * 256 + (int(ivec.b) - 64 + s * 64) * 256 * 256);
 }
 
-BlockData getBlock(vec3 rawData, vec2 texCoord) {
-    BlockData blockData;
-    int data = decodeInt(rawData);
+uint decodeUint(vec3 ivec) {
+    ivec *= 255.0;
+    return uint(ivec.r) * 256u * 256u + uint(ivec.g) * 256u + uint(ivec.b);
+}
 
-    vec2 blockTexCoord = (vec2(data >> 6, data & 63) + texCoord) / 64;
+BlockData getBlock(vec3 rawData, vec2 texCoord, vec3 normal) {
+    BlockData blockData;
+    uint data = decodeUint(rawData);
+
+    uint type = (data >> 4u) & 255u;
+
+    vec2 blockTexCoord = (vec2((data >> 18u) & 63u, (data >> 12u) & 63u) + texCoord);
+
+    switch (type) {
+        case GRASS_BLOCK:
+            blockTexCoord.x += 2 - max(dot(normal, vec3(0, 1, 0)), 0) - max(dot(normal, vec3(0, -1, 0)), 0) * 2;
+            break;
+        case CUBE_COLUMN:
+            blockTexCoord.x += 1 - abs(dot(normal, vec3(0, 1, 0)));
+            break;
+    }
+
+    blockTexCoord /= 64;
+
     blockData.type = 1;
     blockData.blockTexCoord = blockTexCoord;
     blockData.albedo = pow(texture(AtlasSampler, blockTexCoord / 2).rgb, vec3(GAMMA_CORRECTION));
@@ -181,7 +204,7 @@ Hit trace(Ray ray, int maxSteps) {
             vec3 normal = -signedDirection * nextBlock;
             vec2 texCoord = mix((vec2(ray.blockPosition.x, 1.0 - ray.blockPosition.y) - 0.5) * vec2(abs(normal.y) + normal.z, 1.0),
                                 (vec2(1.0 - ray.blockPosition.z, ray.blockPosition.z) - 0.5) * vec2(normal.x + normal.y), nextBlock.xy) + vec2(0.5);
-            BlockData blockData = getBlock(rawData, texCoord);
+            BlockData blockData = getBlock(rawData, texCoord, normal);
             return Hit(rayLength, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
         } else if (distance(ray.currentBlock, vec3(-1.0, -2.0, -1.0)) < 1.8) {
             vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;

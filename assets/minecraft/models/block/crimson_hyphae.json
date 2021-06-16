@@ -1,0 +1,1 @@
+{"ambientocclusion":false,"textures":{"all":"minecraft:block/crimson_hyphae_data"},"elements":[{"from":[7,7,7],"to":[8,8,8],"shade":false,"faces":{"north":{"texture":"#all"},"south":{"texture":"#all"},"up":{"texture":"#all"},"down":{"texture":"#all"},"east":{"texture":"#all"},"west":{"texture":"#all"}}}]}

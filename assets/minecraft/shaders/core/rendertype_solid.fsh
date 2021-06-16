@@ -28,10 +28,6 @@ void main() {
             discard;
         }
     } else {
-        // We'll encode the texture coordinates of the block into the pixel, this way we'll know which block it was.
-        vec2 scaledUV = floor(texCoord0 * 64);
-        int tx = int(scaledUV.x);
-        int ty = int(scaledUV.y);
-        fragColor = vec4(encodeInt((tx << 6) | ty), 1);
+        fragColor = texture(Sampler0, texCoord0);
     }
 }
