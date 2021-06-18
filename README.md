@@ -2,13 +2,18 @@
 
 **Slight epilepsy warning**, the shader generates a lot of noise (this is by design, imagine a very colorful TV static). Don't try it out if you are prone to seizures. This will be remedied in a future patch. (This has been solved somewhat, still not ideal, but much less static-like)
 
-This shader is WIP, therefore it lacks many features, including complete support for some of the blocks. ~~If you still want to try it out, do it in a void world~~ It's not required to play in a void world anymore, but it's still recommended, since entities break it easily.
+This shader is WIP, therefore it lacks many features, including complete support for some of the blocks and all entities. If you want to try it out (although it's not necessary), play in a void or superflat world with the following gamerules:
+
+```
+doMobSpawning false
+doTileDrops false
+```
 
 # Path tracing 1.17 shader
 
-## Notes on the latest version
+## Notes on the latest versions
 
-I'm currently implementing more blocks into the shader. I replaced the in-game atlas with a custom one (vanilla textures still). Most blocks _work_, but not completely (All blocks are cube-shaped and most of them have the same textures on all sides). The only exceptions are vertical column blocks (e.g. vertical logs) and grass blocks.
+I'm currently implementing more blocks into the shader. I replaced the in-game atlas with a custom one (vanilla textures still). Most blocks _work_, but not completely (All blocks are cube-shaped and most of them have the same textures on all sides), with some exceptions (e.g. column blocks like logs, and grass blocks).
 
 The texture atlas will be generated using a separate (open source) program, so custom resource packs will be supported in the future, albeit not without some small work.
 
@@ -24,13 +29,11 @@ Due to the change in the atlas, some features aren't used in this version (emiss
 
 ## How to install
 
-Usually works on the current snapshot (at the time of writing this, it's 1.17 pre-release 1), but make sure to check the last commit date! If it doesn't work on the latest and the date is before the release date of the snapshot, then I probably haven't gotten around to updating it yet. If it works, but the textures are messed up, that means that it's the wrong snapshot.
-
-This also only works if the resolution of your monitors exceeds or matches 1024x768 in both directions
+This shader only works if the resolution of your monitors exceeds or matches 1024x768 in both directions.
 
 1. Press the green `⤓ Code` button and select "Download ZIP"
 2. Extract the content of the ZIP file to your resource pack folder
-3. Start the game and enter into a world (a superflat with the void preset is a good starting point, as most normal worlds don't work)
+3. Start the game and enter into a world 
 4. Go into video settings and set Graphics to _Fabulous!_
 5. Go into resource packs and enable the path tracing resource pack. Make sure to disable anything else, even if they don't have shaders.
 
@@ -53,7 +56,7 @@ floor(Sx / v) * floor(Sy / v) >= v
 A rough approximation can be found quickly by multiplying the width and height of the screen and taking the third root. This will be the maximum value you could reach in an ideal scenario, but the actual value will probably be less.
 
 For instance:
-A 4k screen (3840x2160) has an area of 8294400 pixels, so the theoretical max view area width is 202, but the largest value that satisfies the inequality is 196, therefore the actual value is 196.
+A 4k screen (3840x2160) has an area of 8294400 pixels, so the theoretical maximum view area width is 202, but the largest value that satisfies the inequality is 196, therefore the actual value is 196.
 
 ```
 floor(3840 / 196) = 19
@@ -63,6 +66,7 @@ floor(2160 / 196) = 11
 
 Some values for common screen resolutions (all of these are for fullscreen):
 
+- **resolution: v**
 - 1366x768 (768p): 98
 - 1600x900: 112 (This is a case where actual and max values match)
 - 1920x1080 (1080p): 120
@@ -71,7 +75,7 @@ Some values for common screen resolutions (all of these are for fullscreen):
 - 3840x2160 (4k): 196
 - 7680x4320 (8k): 312 (Maybe the 2 fps you'll be getting at this resolution isn't worth it)
 
-Once you have `v`, you need to edit some files. Go into the resource pack folder and find the files
+Once you have `v`, you need to edit some files. Go into the folder of the resource pack (`%appdata%/.minecraft/resourcepacks/<shader name>/`) and find the files
 
 - `assets/minecraft/shaders/include/utils.glsl`
 - `assets/minecraft/shaders/program/raytracer.fsh`
@@ -86,7 +90,7 @@ const float LAYER_SIZE = 88;                            // This should be "v"
 You should also edit the following line in raytracer.fsh:
 
 ```glsl
-const int MAX_STEPS = 100; // Set this to roughly 2-3 times "v"
+const int MAX_STEPS = 200; // Set this to roughly 2-3 times "v"
 ```
 
 The shader should work at this point with the increased view distance.
