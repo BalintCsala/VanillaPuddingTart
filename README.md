@@ -9,7 +9,7 @@ doMobSpawning false
 doTileDrops false
 ```
 
-# Path tracing 1.17 shader
+# Vanilla pudding tart - Path tracing shader for vanilla Minecraft 1.17+
 
 ## Notes on the latest versions
 
