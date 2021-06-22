@@ -11,6 +11,7 @@ const float LAYER_SIZE = 88;
 #define CUBE_COLUMN     1u
 #define CROSS           16u
 #define GRASS_BLOCK     117u
+#define CUBE_ALL        131u
 
 const float PI = 3.14159265;
 const float PHI = 1.61803398;
@@ -110,17 +111,17 @@ bool combine(inout Hit hit1, inout Hit hit2) {
     return true;
 }
 
-// Calculates the hit point of a ray and a rectangular, arbitarily rotated face
-Hit raytraceFace(vec3 center, vec3 normal, vec3 up, vec2 size, Ray ray) {
+// Calculates the intersection distance between a ray and a face
+float raytraceFace(vec3 center, inout vec3 normal, vec3 up, vec2 size, vec3 rayOrigin, vec3 rayDirection, out vec2 texCoord) {
     // Distance to the plane the face is in
-    float t = dot(center - ray.blockPosition, normal) / dot(ray.direction, normal);
+    float t = dot(center - rayOrigin, normal) / dot(rayDirection, normal);
     // If this is negative, we're facing away from it, therefore no hit
     if (t < EPSILON)
-        return noHit();
+        return -1.0;
 
     // We can then calculate the hit position and adjust normal based on whether it's facing towards the camera
-    vec3 hitPos = ray.blockPosition + ray.direction * t;
-    if (dot(normal, ray.blockPosition - hitPos) < 0)
+    vec3 hitPos = rayOrigin + rayDirection * t;
+    if (dot(normal, rayOrigin - hitPos) < 0)
         normal = -normal;
 
     // We calculate the relative x and y axis of the plane the face is in
@@ -129,15 +130,31 @@ Hit raytraceFace(vec3 center, vec3 normal, vec3 up, vec2 size, Ray ray) {
     vec3 yAxis = cross(xAxis, normal);
 
     // texCoord can then be calculated with dot products and scaled to fit the size
-    vec2 texCoord = vec2(dot(hitPos - center, xAxis), dot(hitPos - center, yAxis));
+    texCoord = vec2(dot(hitPos - center, xAxis), dot(hitPos - center, yAxis)) / size;
 
     // If texCoord.x or texCoord.y is outside of the [-0.5, 0.5] range, the hit position is outside of the face
     if (any(greaterThan(abs(texCoord), vec2(0.5))))
+        return -1.0;
+
+    texCoord += 0.5;
+
+    // Otherwise we return the hit
+    return t;
+}
+
+// Overload for voxel-based tracing
+Hit raytraceFace(vec3 center, vec3 normal, vec3 up, vec2 size, Ray ray) {
+    vec2 texCoord;
+    float t = raytraceFace(center, normal, up, size, ray.blockPosition, ray.direction, texCoord);
+    
+    if (t < EPSILON)
         return noHit();
+
+    vec3 hitPos = ray.blockPosition + ray.direction * t;
 
     // Otherwise we return the hit
     BlockData blockData;
-    return Hit(t, ray.currentBlock, hitPos, normal, blockData, texCoord + 0.5);
+    return Hit(t, ray.currentBlock, hitPos, normal, blockData, texCoord);
 }
 
 // Overload for when up = (0, 1, 0)
@@ -162,20 +179,35 @@ uint decodeUint(vec3 ivec) {
 }
 
 // Returns the block data for the block at the specified position
-BlockData getBlock(inout Ray ray, inout vec2 texCoord, inout vec3 normal, out float extraLength) {
+BlockData getBlock(inout Ray ray, inout vec2 texCoord, inout vec3 normal, out float extraLength, bool onlyNonFull) {
     extraLength = 0;
     vec3 rawData = texture(DiffuseSampler, blockToTexCoord(ray.currentBlock)).rgb;
     uint data = decodeUint(rawData);
 
     BlockData blockData;
-    blockData.type = (data >> 4u) & 255u;
+    uint rawType = (data >> 4u) & 255u;
+    blockData.type = AIR;
     blockData.blockTexCoord = (vec2((data >> 18u) & 63u, (data >> 12u) & 63u));
 
-    switch (blockData.type) {
-        case CUBE_COLUMN:
-            blockData.blockTexCoord.x += 1 - abs(dot(normal, vec3(0, 1, 0)));
-            break;
+    if (!onlyNonFull) {
+        switch (rawType) {
+            case CUBE_ALL:
+                blockData.type = rawType;
+                break;
+            case CUBE_COLUMN:
+                blockData.type = rawType;
+                blockData.blockTexCoord.x += 1 - abs(dot(normal, vec3(0, 1, 0)));
+                break;
+            case GRASS_BLOCK:
+                blockData.type = rawType;
+                blockData.blockTexCoord.x += 2 - max(dot(normal, vec3(0, 1, 0)), 0) - max(dot(normal, vec3(0, -1, 0)), 0) * 2;
+                break;
+
+        }
+    }
+    switch (rawType) {
         case CROSS:
+            blockData.type = rawType;
             Hit hit1 = raytraceFace(vec3(0.5), vec3(1, 0, 1) / SQRT_2, vec2(1), ray);
             Hit hit2 = raytraceFace(vec3(0.5), vec3(1, 0, -1) / SQRT_2, vec2(1), ray);
 
@@ -196,9 +228,6 @@ BlockData getBlock(inout Ray ray, inout vec2 texCoord, inout vec3 normal, out fl
             normal = vec3(0, 1, 0);
             ray.currentBlock = hit.block;
 
-            break;
-        case GRASS_BLOCK:
-            blockData.blockTexCoord.x += 2 - max(dot(normal, vec3(0, 1, 0)), 0) - max(dot(normal, vec3(0, -1, 0)), 0) * 2;
             break;
 
     }
@@ -261,29 +290,48 @@ Hit trace(Ray ray, int maxSteps) {
     
     // We also use an SDF to skip checking the blocks for some of the positions
 
+    
+    // Check the current block to see if we're already in one (self-shadows don't work otherwise)
+    
     float rayLength = 0;
+    float extraLength;
+    vec2 texCoord;
+    vec3 normal;
+    BlockData blockData = getBlock(ray, texCoord, normal, extraLength, true);
+    if (blockData.type != AIR)
+        return Hit(rayLength + extraLength, ray.currentBlock, ray.blockPosition + ray.direction * extraLength, normal, blockData, texCoord);
+    
     vec3 signedDirection = sign(ray.direction);
     
     // The steps in each direction:
     vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
     // Cap the amount of steps we take to make sure no ifinite loop happens.
     int voxelStep = 0;
-    bool skip = false;
+    bool skip = true;
     while (voxelStep < maxSteps) {
+            
+        // We always increment it to make sure there's no infinite loop
+        voxelStep++;
+
         vec3 nextBlock;
         while (true) {
-            int distanceToClosest = max(int(round(texture(DistanceSampler, blockToTexCoord(ray.currentBlock)).r * 255)), int(skip));
+            int distanceToClosest = max(int(texture(DistanceSampler, blockToTexCoord(ray.currentBlock)).r * 255), int(skip));
             skip = false;
             
-            if (distanceToClosest == 0)
+            voxelStep += distanceToClosest;
+
+            if (distanceToClosest == 0 || voxelStep >= maxSteps)
                 break;
 
+            vec3 startWorldPosition = ray.currentBlock + ray.blockPosition;
+            float distanceSkipped = 0;
             for (int j = 0; j < distanceToClosest; j++) {
                 float stepLength = min(min(steps.x, steps.y), steps.z);
 
                 ray.blockPosition += stepLength * ray.direction;
                 steps -= stepLength;
                 rayLength += stepLength;
+                distanceSkipped += stepLength;
 
                 // We select the smallest of the steps and update the current block and block position.
                 nextBlock = step(steps, vec3(EPSILON));
@@ -291,10 +339,28 @@ Hit trace(Ray ray, int maxSteps) {
                 ray.currentBlock += signedDirection * nextBlock;
                 ray.blockPosition = mix(ray.blockPosition, step(signedDirection, vec3(0.5)), nextBlock);
                 steps += signedDirection / ray.direction * nextBlock;
-                voxelStep++;
             }
 
-            if (any(greaterThan(abs(ray.currentBlock), vec3(LAYER_SIZE / 2 - 1)))) {
+            vec3 steveNormal = normalize(vec3(facingDirection.x, 0, facingDirection.z));
+            vec2 steveTexCoord;
+            float steveT = raytraceFace(vec3(0, -0.9, 0) - chunkOffset, steveNormal, vec3(0, 1, 0), vec2(1, 1.8), startWorldPosition, ray.direction, steveTexCoord);
+            if (steveT > EPSILON && steveT < distanceSkipped) {
+                steveTexCoord.x = steveTexCoord.x / 6 + steveCoordOffset;
+                vec4 color = texture(SteveSampler, steveTexCoord); 
+                if (color.a > 0.5) {
+                    BlockData steveData;
+                    steveData.type = 255u;
+                    steveData.albedo = color.rgb;
+                    steveData.F0 = vec3(0);
+                    steveData.emission = vec4(0);
+                    steveData.metallicity = 0;
+                    steveData.roughness = 0.5;
+                    vec3 hitPos = startWorldPosition + steveT * ray.direction;
+                    return Hit(steveT, floor(hitPos), fract(hitPos), steveNormal, steveData, steveTexCoord);
+                }
+            }
+
+            if (any(greaterThan(abs(ray.currentBlock), vec3(LAYER_SIZE / 2)))) {
                 // We're outside of the known world, here be dragons. Let's stop
                 return noHit();
             }
@@ -302,37 +368,17 @@ Hit trace(Ray ray, int maxSteps) {
 
     
         // We can now query the block at the current position.
-        vec3 normal = -signedDirection * nextBlock;
-        vec2 texCoord = mix((vec2(ray.blockPosition.x, 1.0 - ray.blockPosition.y) - 0.5) * vec2(abs(normal.y) + normal.z, 1.0),
+        normal = -signedDirection * nextBlock;
+        texCoord = mix((vec2(ray.blockPosition.x, 1.0 - ray.blockPosition.y) - 0.5) * vec2(abs(normal.y) + normal.z, 1.0),
                                 (vec2(1.0 - ray.blockPosition.z, ray.blockPosition.z) - 0.5) * vec2(normal.x + normal.y), nextBlock.xy) + vec2(0.5);
         
-        float extraLength;
-        BlockData blockData = getBlock(ray, texCoord, normal, extraLength);
-        if (blockData.type > AIR)
+        blockData = getBlock(ray, texCoord, normal, extraLength, false);
+        if (blockData.type != AIR)
             return Hit(rayLength + extraLength, ray.currentBlock, ray.blockPosition + ray.direction * extraLength, normal, blockData, texCoord);
+
 
         // We didn't hit the block, so we skip it the next time
         skip = true;
-        /* else if (distance(ray.currentBlock, vec3(-1.0, -2.0, -1.0)) < 1.8) {
-            vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
-            float steveDistance = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, EPSILON, facingDirection.z));
-            vec3 thingHitPos = rayActualPos + ray.direction * steveDistance;
-            float nextStepLength = min(min(steps.x, steps.y), steps.z);
-            // Let's check whether the ray will intersect a cylinder
-            if (abs(2.0 * steveDistance - nextStepLength) < nextStepLength && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
-                Hit hit;
-                hit.traceLength = 999;
-
-                hit.texCoord = vec2((dot(thingHitPos.xz, vec2(-horizontalFacingDirection.y, horizontalFacingDirection.x)) + 0.5) / 6 + steveCoordOffset,
-                                    0.10 - thingHitPos.y / 2);
-
-                vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
-                if (thingColor.x + thingColor.y + thingColor.z > EPSILON) {
-                    hit.blockData.albedo = pow(thingColor, vec3(GAMMA_CORRECTION));
-                    return hit;
-                }
-            }
-        }*/
     }
     return noHit();
 }

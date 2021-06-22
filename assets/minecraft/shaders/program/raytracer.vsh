@@ -109,7 +109,7 @@ void main() {
     horizontalFacingDirection = normalize(facingDirection.xz);
 
     steveCoordOffset = 0.0;
-    if (movement.x + movement.y + movement.z > EPSILON) {
+    if (movement.x + movement.z > EPSILON) {
         steveCoordOffset += (floor(fract(Time * 2) / 0.5) + 1) / 6;
     }
     if (chunkOffset.y > 0.7) {
