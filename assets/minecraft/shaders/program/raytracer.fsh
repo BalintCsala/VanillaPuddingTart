@@ -7,11 +7,15 @@ const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
 const float LAYER_SIZE = 88;
 
 // Block types
-#define CUBE_COLUMN 1u
-#define GRASS_BLOCK 117u
+#define AIR             0u
+#define CUBE_COLUMN     1u
+#define CROSS           16u
+#define GRASS_BLOCK     117u
+#define CUBE_ALL        131u
 
-const float PI = 3.141592654;
-const float PHI = 1.618033988749894848204586;
+const float PI = 3.14159265;
+const float PHI = 1.61803398;
+const float SQRT_2 = 1.4142135;
 const float EPSILON = 0.00001;
 
 const float GAMMA_CORRECTION = 2.2;
@@ -31,6 +35,7 @@ uniform sampler2D AtlasSampler;
 uniform sampler2D SteveSampler;
 // Blue noise from http://momentsingraphics.de/BlueNoise.html
 uniform sampler2D NoiseSampler;
+uniform sampler2D DistanceSampler;
 
 uniform vec2 OutSize;
 uniform float Time;
@@ -59,7 +64,7 @@ struct Ray {
 };
 
 struct BlockData {
-    int type;
+    uint type;
     vec2 blockTexCoord;
     vec3 albedo;
     vec3 F0;
@@ -77,66 +82,170 @@ struct Hit {
     vec2 texCoord;
 };
 
-// No moj_import here
-
-vec2 pixelToTexCoord(vec2 pixel) {
-    return pixel / (VOXEL_STORAGE_RESOLUTION - 1);
+Hit noHit() {
+    Hit res;
+    res.traceLength = -1;
+    return res;
 }
 
-vec2 blockToPixel(vec3 position) {
-    // The block data is split into layers. Each layer is 60x60 blocks and represents a single y height.
-    // Therefore the position inside a layer is just the position of the block on the xz plane relative to the player.
-    vec2 inLayerPos = position.xz + LAYER_SIZE / 2;
-    // There are 60 layers, we store them in an 8x8 area.
-    vec2 layerStart = vec2(mod(position.y + LAYER_SIZE / 2, STORAGE_DIMENSIONS.y), floor((position.y + LAYER_SIZE / 2) / STORAGE_DIMENSIONS.y)) * LAYER_SIZE;
-    // The 0.5 offset is to read the center of the "pixels", the +1 offset on the y is to not interfere with the control line
-    return layerStart + inLayerPos + vec2(0.5, 1.5);
+BlockData air() {
+    BlockData res;
+    res.type = AIR;
+    return res;
 }
 
-int decodeInt(vec3 ivec) {
-    ivec *= 255.0;
-    int s = int(sign(127.9 - ivec.b));
-    return s * (int(ivec.r) + int(ivec.g) * 256 + (int(ivec.b) - 64 + s * 64) * 256 * 256);
-}
+// Sorts the input hits so that the first is the first hit
+// Returns if either of them were successful
+bool combine(inout Hit hit1, inout Hit hit2) {
 
-uint decodeUint(vec3 ivec) {
-    ivec *= 255.0;
-    return uint(ivec.r) * 256u * 256u + uint(ivec.g) * 256u + uint(ivec.b);
-}
+    if (hit1.traceLength < EPSILON && hit2.traceLength < EPSILON)
+        return false;
 
-BlockData getBlock(vec3 rawData, vec2 texCoord, vec3 normal) {
-    BlockData blockData;
-    uint data = decodeUint(rawData);
-
-    uint type = (data >> 4u) & 255u;
-
-    vec2 blockTexCoord = (vec2((data >> 18u) & 63u, (data >> 12u) & 63u) + texCoord);
-
-    switch (type) {
-        case GRASS_BLOCK:
-            blockTexCoord.x += 2 - max(dot(normal, vec3(0, 1, 0)), 0) - max(dot(normal, vec3(0, -1, 0)), 0) * 2;
-            break;
-        case CUBE_COLUMN:
-            blockTexCoord.x += 1 - abs(dot(normal, vec3(0, 1, 0)));
-            break;
+    // If they aren't in the right order, we swap them
+    if (!((hit1.traceLength > EPSILON && hit1.traceLength < hit2.traceLength) || hit2.traceLength < EPSILON)) {
+        Hit temp = hit1;
+        hit1 = hit2;
+        hit2 = temp;
     }
 
-    blockTexCoord /= 64;
+    return true;
+}
 
-    blockData.type = 1;
-    blockData.blockTexCoord = blockTexCoord;
-    blockData.albedo = pow(texture(AtlasSampler, blockTexCoord / 2).rgb, vec3(GAMMA_CORRECTION));
-    blockData.F0 = texture(AtlasSampler, blockTexCoord / 2 + vec2(0, 0.5)).rgb;
-    blockData.emission = pow(texture(AtlasSampler, blockTexCoord / 2 + vec2(0.5, 0)), vec4(vec3(GAMMA_CORRECTION), 1.0));
+// Calculates the intersection distance between a ray and a face
+float raytraceFace(vec3 center, inout vec3 normal, vec3 up, vec2 size, vec3 rayOrigin, vec3 rayDirection, out vec2 texCoord) {
+    // Distance to the plane the face is in
+    float t = dot(center - rayOrigin, normal) / dot(rayDirection, normal);
+    // If this is negative, we're facing away from it, therefore no hit
+    if (t < EPSILON)
+        return -1.0;
 
-    vec4 combined = texture(AtlasSampler, blockTexCoord / 2 + 0.5);
+    // We can then calculate the hit position and adjust normal based on whether it's facing towards the camera
+    vec3 hitPos = rayOrigin + rayDirection * t;
+    if (dot(normal, rayOrigin - hitPos) < 0)
+        normal = -normal;
+
+    // We calculate the relative x and y axis of the plane the face is in
+    // xAxis, yAxis and normal should all be 90deg apart from each other
+    vec3 xAxis = cross(up, normal);
+    vec3 yAxis = cross(xAxis, normal);
+
+    // texCoord can then be calculated with dot products and scaled to fit the size
+    texCoord = vec2(dot(hitPos - center, xAxis), dot(hitPos - center, yAxis)) / size;
+
+    // If texCoord.x or texCoord.y is outside of the [-0.5, 0.5] range, the hit position is outside of the face
+    if (any(greaterThan(abs(texCoord), vec2(0.5))))
+        return -1.0;
+
+    texCoord += 0.5;
+
+    // Otherwise we return the hit
+    return t;
+}
+
+// Overload for voxel-based tracing
+Hit raytraceFace(vec3 center, vec3 normal, vec3 up, vec2 size, Ray ray) {
+    vec2 texCoord;
+    float t = raytraceFace(center, normal, up, size, ray.blockPosition, ray.direction, texCoord);
+    
+    if (t < EPSILON)
+        return noHit();
+
+    vec3 hitPos = ray.blockPosition + ray.direction * t;
+
+    // Otherwise we return the hit
+    BlockData blockData;
+    return Hit(t, ray.currentBlock, hitPos, normal, blockData, texCoord);
+}
+
+// Overload for when up = (0, 1, 0)
+Hit raytraceFace(vec3 center, vec3 normal, vec2 size, Ray ray) {
+    return raytraceFace(center, normal, vec3(0, 1, 0), size, ray);
+}
+
+// Converts block coordinates to texture coordinates for voxel lookup
+vec2 blockToTexCoord(vec3 position) {
+    // We offset everything by LAYER_SIZE / 2 to make sure it's positive
+    position += LAYER_SIZE / 2;
+    // We store the blocks in layers
+    vec2 inLayerPos = position.xz;
+    vec2 layerStart = vec2(mod(position.y, STORAGE_DIMENSIONS.y), floor(position.y / STORAGE_DIMENSIONS.y)) * LAYER_SIZE;
+    return (layerStart + inLayerPos + vec2(0.5, 1.5)) / (VOXEL_STORAGE_RESOLUTION - 1);
+}
+
+// Decodes stored rgb values into a uint value
+uint decodeUint(vec3 ivec) {
+    ivec *= 255.0;
+    return (uint(ivec.r) << 16) | (uint(ivec.g) << 8) | uint(ivec.b);
+}
+
+// Returns the block data for the block at the specified position
+BlockData getBlock(inout Ray ray, inout vec2 texCoord, inout vec3 normal, out float extraLength, bool onlyNonFull) {
+    extraLength = 0;
+    vec3 rawData = texture(DiffuseSampler, blockToTexCoord(ray.currentBlock)).rgb;
+    uint data = decodeUint(rawData);
+
+    BlockData blockData;
+    uint rawType = (data >> 4u) & 255u;
+    blockData.type = AIR;
+    blockData.blockTexCoord = (vec2((data >> 18u) & 63u, (data >> 12u) & 63u));
+
+    if (!onlyNonFull) {
+        switch (rawType) {
+            case CUBE_ALL:
+                blockData.type = rawType;
+                break;
+            case CUBE_COLUMN:
+                blockData.type = rawType;
+                blockData.blockTexCoord.x += 1 - abs(dot(normal, vec3(0, 1, 0)));
+                break;
+            case GRASS_BLOCK:
+                blockData.type = rawType;
+                blockData.blockTexCoord.x += 2 - max(dot(normal, vec3(0, 1, 0)), 0) - max(dot(normal, vec3(0, -1, 0)), 0) * 2;
+                break;
+
+        }
+    }
+    switch (rawType) {
+        case CROSS:
+            blockData.type = rawType;
+            Hit hit1 = raytraceFace(vec3(0.5), vec3(1, 0, 1) / SQRT_2, vec2(1), ray);
+            Hit hit2 = raytraceFace(vec3(0.5), vec3(1, 0, -1) / SQRT_2, vec2(1), ray);
+
+            bool success = combine(hit1, hit2);
+
+            if (!success)
+                return air();
+            
+            Hit hit = hit1;
+            if (texture(AtlasSampler, (blockData.blockTexCoord + hit.texCoord) / 128).a < 0.5)
+                hit = hit2;
+            
+            if (hit.traceLength < EPSILON)
+                return air();
+
+            extraLength = hit.traceLength;
+            texCoord = hit.texCoord;
+            normal = vec3(0, 1, 0);
+            ray.currentBlock = hit.block;
+
+            break;
+
+    }
+
+    blockData.blockTexCoord = (blockData.blockTexCoord + texCoord) / 64;
+
+    vec4 textureData = texture(AtlasSampler, blockData.blockTexCoord / 2);
+    if (textureData.a < 1.0 / 255)
+        return air();
+
+    blockData.albedo = pow(textureData.rgb, vec3(GAMMA_CORRECTION));
+    blockData.F0 = texture(AtlasSampler, blockData.blockTexCoord / 2 + vec2(0, 0.5)).rgb;
+    blockData.emission = pow(texture(AtlasSampler, blockData.blockTexCoord / 2 + vec2(0.5, 0)), vec4(vec3(GAMMA_CORRECTION), 1.0));
+
+    vec4 combined = texture(AtlasSampler, blockData.blockTexCoord / 2 + 0.5);
     blockData.metallicity = combined.r;
     blockData.roughness = combined.g;
     return blockData;
-}
-
-float intersectPlane(vec3 origin, vec3 direction, vec3 normal) {
-    return dot(-origin, normal) / dot(direction, normal);
 }
 
 // By Inigo Quilez - https://www.shadertoy.com/view/XlXcW4
@@ -150,12 +259,14 @@ vec3 hash(uvec3 x) {
     return vec3(x) * (1.0 / float(0xffffffffU));
 }
 
+// Returns a noise value for the current fragment using the specified seed
 vec3 noise(float seed) {
     uvec3 p = uvec3(gl_FragCoord.xy, (Time * 32.46432 + seed) * 60);
     vec3 offset = hash(p) * PHI;
     return mod(texture(NoiseSampler, gl_FragCoord.xy / textureSize(NoiseSampler, 0)).rgb + offset, 1);
 }
 
+// Chooses a random direction using cosine weighted hemisphere sampling
 vec3 randomDirection(vec2 coords, vec3 normal, float seed, float deviateFactor) {
     vec3 v = noise(seed);
     float angle = 2 * PI * v.x;
@@ -165,73 +276,114 @@ vec3 randomDirection(vec2 coords, vec3 normal, float seed, float deviateFactor) 
     return normalize(normal + directionOffset * deviateFactor);
 }
 
+// Calculates the fresnel factor based on angle and F0
 vec3 fresnel(vec3 F0, float cosTheta) {
     return F0 + (1 - F0) * pow(max(1 - cosTheta, 0), 5);
 }
 
+// Traces a ray through the voxel field
 Hit trace(Ray ray, int maxSteps) {
+    // The world is divided into blocks, so we can use a simplified tracing algorithm where we always go to the
+    // nearest block boundary. This can be very easily calculated by dividing the signed distance to the six walls
+    // of the current block by the signed components of the ray's direction. This way we get the size of the step
+    // we need to take to reach a wall in that direction.
+    
+    // We also use an SDF to skip checking the blocks for some of the positions
+
+    
+    // Check the current block to see if we're already in one (self-shadows don't work otherwise)
+    
     float rayLength = 0;
+    float extraLength;
+    vec2 texCoord;
+    vec3 normal;
+    BlockData blockData = getBlock(ray, texCoord, normal, extraLength, true);
+    if (blockData.type != AIR)
+        return Hit(rayLength + extraLength, ray.currentBlock, ray.blockPosition + ray.direction * extraLength, normal, blockData, texCoord);
+    
     vec3 signedDirection = sign(ray.direction);
+    
+    // The steps in each direction:
     vec3 steps = (signedDirection * 0.5 + 0.5 - ray.blockPosition) / ray.direction;
     // Cap the amount of steps we take to make sure no ifinite loop happens.
-    for (int i = 0; i < maxSteps; i++) {
-        // The world is divided into blocks, so we can use a simplified tracing algorithm where we always go to the
-        // nearest block boundary. This can be very easily calculated by dividing the signed distance to the six walls
-        // of the current block by the signed components of the ray's direction. This way we get the size of the step
-        // we need to take to reach a wall in that direction. This could be faster by precomputing 1 divided by the
-        // components of the ray's direction, but I'll keep it simple here. Faster algorithms also exist.
+    int voxelStep = 0;
+    bool skip = true;
+    while (voxelStep < maxSteps) {
+            
+        // We always increment it to make sure there's no infinite loop
+        voxelStep++;
 
-        // The steps in each direction:
-        float stepLength = min(min(steps.x, steps.y), steps.z);
+        vec3 nextBlock;
+        while (true) {
+            int distanceToClosest = max(int(texture(DistanceSampler, blockToTexCoord(ray.currentBlock)).r * 255), int(skip));
+            skip = false;
+            
+            voxelStep += distanceToClosest;
 
-        ray.blockPosition += stepLength * ray.direction;
-        steps -= stepLength;
-        rayLength += stepLength;
+            if (distanceToClosest == 0 || voxelStep >= maxSteps)
+                break;
 
-        // We select the smallest of the steps and update the current block and block position.
-        vec3 nextBlock = step(steps, vec3(EPSILON));
+            vec3 startWorldPosition = ray.currentBlock + ray.blockPosition;
+            float distanceSkipped = 0;
+            for (int j = 0; j < distanceToClosest; j++) {
+                float stepLength = min(min(steps.x, steps.y), steps.z);
 
-        ray.currentBlock += signedDirection * nextBlock;
-        ray.blockPosition = mix(ray.blockPosition, step(signedDirection, vec3(0.5)), nextBlock);
-        steps += signedDirection / ray.direction * nextBlock;
+                ray.blockPosition += stepLength * ray.direction;
+                steps -= stepLength;
+                rayLength += stepLength;
+                distanceSkipped += stepLength;
 
-        // We can now query if there's a block at the current position.
-        vec3 rawData = texture(DiffuseSampler, pixelToTexCoord(blockToPixel(ray.currentBlock))).rgb;
-        if (any(greaterThan(abs(ray.currentBlock), vec3(LAYER_SIZE / 2 - 1)))) {
-            // We're outside of the known world, there will be dragons. Let's stop
-            break;
-        } else if (rawData.x + rawData.y + rawData.z + EPSILON < 3) {
-            vec3 normal = -signedDirection * nextBlock;
-            vec2 texCoord = mix((vec2(ray.blockPosition.x, 1.0 - ray.blockPosition.y) - 0.5) * vec2(abs(normal.y) + normal.z, 1.0),
-                                (vec2(1.0 - ray.blockPosition.z, ray.blockPosition.z) - 0.5) * vec2(normal.x + normal.y), nextBlock.xy) + vec2(0.5);
-            BlockData blockData = getBlock(rawData, texCoord, normal);
-            return Hit(rayLength, ray.currentBlock, ray.blockPosition, normal, blockData, texCoord);
-        } else if (distance(ray.currentBlock, vec3(-1.0, -2.0, -1.0)) < 1.8) {
-            vec3 rayActualPos = ray.currentBlock + ray.blockPosition + chunkOffset;
-            float steveDistance = intersectPlane(rayActualPos, ray.direction, vec3(facingDirection.x, EPSILON, facingDirection.z));
-            vec3 thingHitPos = rayActualPos + ray.direction * steveDistance;
-            float nextStepLength = min(min(steps.x, steps.y), steps.z);
-            // Let's check whether the ray will intersect a cylinder
-            if (abs(2.0 * steveDistance - nextStepLength) < nextStepLength && abs(0.70 + thingHitPos.y) < 1 && length(thingHitPos.xz) < 0.5) {
-                Hit hit;
-                hit.traceLength = 999;
+                // We select the smallest of the steps and update the current block and block position.
+                nextBlock = step(steps, vec3(EPSILON));
 
-                hit.texCoord = vec2((dot(thingHitPos.xz, vec2(-horizontalFacingDirection.y, horizontalFacingDirection.x)) + 0.5) / 6 + steveCoordOffset,
-                                    0.10 - thingHitPos.y / 2);
+                ray.currentBlock += signedDirection * nextBlock;
+                ray.blockPosition = mix(ray.blockPosition, step(signedDirection, vec3(0.5)), nextBlock);
+                steps += signedDirection / ray.direction * nextBlock;
+            }
 
-                vec3 thingColor = texture(SteveSampler, hit.texCoord).rgb;
-                if (thingColor.x + thingColor.y + thingColor.z > EPSILON) {
-                    hit.blockData.albedo = pow(thingColor, vec3(GAMMA_CORRECTION));
-                    return hit;
+            vec3 steveNormal = normalize(vec3(facingDirection.x, 0, facingDirection.z));
+            vec2 steveTexCoord;
+            float steveT = raytraceFace(vec3(0, -0.9, 0) - chunkOffset, steveNormal, vec3(0, 1, 0), vec2(1, 1.8), startWorldPosition, ray.direction, steveTexCoord);
+            if (steveT > EPSILON && steveT < distanceSkipped) {
+                steveTexCoord.x = steveTexCoord.x / 6 + steveCoordOffset;
+                vec4 color = texture(SteveSampler, steveTexCoord); 
+                if (color.a > 0.5) {
+                    BlockData steveData;
+                    steveData.type = 255u;
+                    steveData.albedo = color.rgb;
+                    steveData.F0 = vec3(0);
+                    steveData.emission = vec4(0);
+                    steveData.metallicity = 0;
+                    steveData.roughness = 0.5;
+                    vec3 hitPos = startWorldPosition + steveT * ray.direction;
+                    return Hit(steveT, floor(hitPos), fract(hitPos), steveNormal, steveData, steveTexCoord);
                 }
             }
+
+            if (any(greaterThan(abs(ray.currentBlock), vec3(LAYER_SIZE / 2)))) {
+                // We're outside of the known world, here be dragons. Let's stop
+                return noHit();
+            }
         }
+
+    
+        // We can now query the block at the current position.
+        normal = -signedDirection * nextBlock;
+        texCoord = mix((vec2(ray.blockPosition.x, 1.0 - ray.blockPosition.y) - 0.5) * vec2(abs(normal.y) + normal.z, 1.0),
+                                (vec2(1.0 - ray.blockPosition.z, ray.blockPosition.z) - 0.5) * vec2(normal.x + normal.y), nextBlock.xy) + vec2(0.5);
+        
+        blockData = getBlock(ray, texCoord, normal, extraLength, false);
+        if (blockData.type != AIR)
+            return Hit(rayLength + extraLength, ray.currentBlock, ray.blockPosition + ray.direction * extraLength, normal, blockData, texCoord);
+
+
+        // We didn't hit the block, so we skip it the next time
+        skip = true;
     }
-    Hit hit;
-    hit.traceLength = -1;
-    return hit;
+    return noHit();
 }
 
+// Calculates the global illumination at a hit position
 vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
     vec3 accumulated = vec3(0.0);
     vec3 weight = vec3(1.0);
@@ -267,6 +419,7 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
     return accumulated;
 }
 
+// Main path tracing code
 vec3 pathTrace(Ray ray, out float depth) {
     vec3 accumulated = vec3(0.0);
     vec3 weight = vec3(1.0);
@@ -346,7 +499,6 @@ vec3 uchimura(vec3 x) {
 
 void main() {
     // Set the pixel to black in case we don'steps hit anything.
-    // Define the ray we need to trace. The origin is always 0, since the blockdata is relative to the player.
     vec3 nRayDir = normalize(rayDir);
     Ray ray = Ray(vec3(-1), 1 - chunkOffset, nRayDir);
 
@@ -354,9 +506,12 @@ void main() {
     vec3 color = pathTrace(ray, depth);
     if (depth < 0) depth = far;
 
+    // HDR scaling
     color.rgb = uchimura(color.rgb);
     fragColor = vec4(pow(color, vec3(1.0 / GAMMA_CORRECTION)), 1);
 
+    // We can set depth of the fragment so transparency.json can work correctly
+    // Pretty much a copy of how you'd usually do it, position would be gl_Position
     vec4 position = projMat * modelViewMat * vec4(nRayDir * (depth - near), 1);
     float diffuseDepth = position.z / position.w;
     gl_FragDepth = (diffuseDepth + 1) / 2;
