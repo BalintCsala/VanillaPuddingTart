@@ -1,7 +1,5 @@
 # ❗ <ins>Before you try it out, read this!</ins> ❗
 
-**Slight epilepsy warning**, the shader generates a lot of noise (this is by design, imagine a very colorful TV static). Don't try it out if you are prone to seizures. This will be remedied in a future patch. (This has been solved somewhat, still not ideal, but much less static-like)
-
 This shader is WIP, therefore it lacks many features, including complete support for some of the blocks and all entities. If you want to try it out (although it's not necessary), play in a void or superflat world with the following gamerules:
 
 ```
@@ -9,15 +7,13 @@ doMobSpawning false
 doTileDrops false
 ```
 
+(You'll want to avoid any lava. If you see random blocks popping into existence and back, it's either lava or entities)
+
 # Vanilla pudding tart - Path tracing shader for vanilla Minecraft 1.17+
 
-## Notes on the latest versions
+## Using this resource pack
 
-I'm currently implementing more blocks into the shader. I replaced the in-game atlas with a custom one (vanilla textures still). Most blocks _work_, but not completely (All blocks are cube-shaped and most of them have the same textures on all sides), with some exceptions (e.g. column blocks like logs, and grass blocks).
-
-The texture atlas will be generated using a separate (open source) program, so custom resource packs will be supported in the future, albeit not without some small work.
-
-Due to the change in the atlas, some features aren't used in this version (emission, reflections, roughness, etc.). They are still supported and can easily be enabled by editing the atlas manually, but no blocks do this by default. The atlas generator will be released once it has support for these options.
+Contrary to the name, this pack doesn't have any custom textures (mostly because I'm bad at them), so it uses the vanilla textures. Since those don't have any of the required properties for most of the features (reflections, emission, etc.), they won't show up. To solve this, use [Tart Tin](https://github.com/BalintCsala/TartTin). This requires a LabPBR compatible resource pack, some can be found [here](https://github.com/rre36/lab-pbr/wiki/Resource-Packs).
 
 ## Features
 
@@ -97,16 +93,7 @@ The shader should work at this point with the increased view distance.
 
 ## Expert mode
 
-> If you want to edit the material properties of blocks, this is where you need to be looking.
-
-A single atlas controls the material properties for all blocks. This can be found at `assets/minecraft/textures/effect/atlas.png`.
-
-The texture is divided into 4 parts:
-
-- The top left corner is the normal texture atlas (albedo if you will).
-- The top right corner is emission information. Transparent is no emission, strength of a light is based on the alpha channel (you need to lay the atlas on top of this temporarily, if you want to edit it).
-- The bottom left corner is F0 (amount of refraction when looking at a surface directly, essentially reflection color). Generally should be gray for non-metallic (dielectric) materials and colored for metals. Use schlick's approximation to calculate it from refractive index (`F0 = (n-1)^2 / (n + 1)^2`, where `n` is the refractive index).
-- The bottom right corner is a combined metallicity (red channel) and roughness (green channel) map. In the future this will also hold other miscellaneous values if needed.
+> Textures are now generated, please refer to [Tart Tin](https://github.com/BalintCsala/TartTin)
 
 ## Pro mode
 

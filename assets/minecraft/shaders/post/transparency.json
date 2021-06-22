@@ -1,7 +1,5 @@
 {
     "targets": [
-        "sdf_swap1",
-        "sdf_swap2",
         "water",
         "translucent",
         "itemEntity",
@@ -15,141 +13,6 @@
         "combined"
     ],
     "passes": [
-        {
-            "name": "sdf_init",
-            "intarget": "minecraft:main",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap1",
-            "outtarget": "sdf_swap2"
-        },
-        {
-            "name": "sdf_step",
-            "intarget": "sdf_swap2",
-            "outtarget": "sdf_swap1"
-        },
         {
             "name": "raytracer",
             "intarget": "minecraft:main",
@@ -179,10 +42,6 @@
                     "width": 1,
                     "height": 1,
                     "bilinear": false
-                },
-                {
-                    "name": "DistanceSampler",
-                    "id": "sdf_swap1"
                 }
             ]
         },
