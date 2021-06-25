@@ -1,13 +1,14 @@
 # ❗ <ins>Before you try it out, read this!</ins> ❗
 
-This shader is WIP, therefore it lacks many features, including complete support for some of the blocks and all entities. If you want to try it out (although it's not necessary), play in a void or superflat world with the following gamerules:
+This shader is WIP, therefore it lacks many features, including complete support for some of the blocks and all entities. If you want to try it out (although it's not necessary), play in a void or superflat world. Regardless of what you use, set the following game rules:
 
 ```
 doMobSpawning false
 doTileDrops false
 ```
+After this, do `/kill @e[type=!player]` twice to make sure nothing's left.
 
-(You'll want to avoid any lava. If you see random blocks popping into existence and back, it's either lava or entities)
+(You'll want to avoid any lava. If you see random blocks or full layers popping into existence and back, it's either lava or entities)
 
 # Vanilla pudding tart - Path tracing shader for vanilla Minecraft 1.17+
 
@@ -25,13 +26,14 @@ Contrary to the name, this pack doesn't have any custom textures (mostly because
 
 ## How to install
 
-This shader only works if the resolution of your monitors exceeds or matches 1024x768 in both directions.
+This shader only works if the resolution of your monitor exceeds or matches 1024x768 in both directions.
 
 1. Press the green `⤓ Code` button and select "Download ZIP"
 2. Extract the content of the ZIP file to your resource pack folder
-3. Start the game and enter into a world 
-4. Go into video settings and set Graphics to _Fabulous!_
-5. Go into resource packs and enable the path tracing resource pack. Make sure to disable anything else, even if they don't have shaders.
+3. Install a resource pack (instructions at [Tart Tin](https://github.com/BalintCsala/TartTin))
+4. Start the game and enter into a world 
+5. Go into video settings and set Graphics to _Fabulous!_
+6. Go into resource packs and enable the path tracing resource pack. Make sure to disable anything else, even if they don't have shaders.
 
 ## Adept mode
 
@@ -43,10 +45,10 @@ I can't increase this without removing support for a bunch of people, so if you 
 
 > Whenever I mention the resolution in the following paragraph, I mean the actual resolution the game is running at. This will only match the monitor resolution when the game is in full screen. You can find the actual resolution on the F3 debug screen in-game on the right side.
 
-The maximum viewable area width (2 x view distance) `v` can be calculated using the following equation, where Sx and Sy are the screen width and height in pixels and `floor` gives you the integer part of a decimal (`floor(5.6) = 5`):
+The maximum viewable area width (2 x view distance) `size` can be calculated using the following equation, where `screen_width` and `screen_height` are the screen width and height in pixels and `floor` gives you the integer part of a decimal (`floor(5.6) = 5`):
 
 ```
-floor(Sx / v) * floor(Sy / v) >= v
+floor(screen_width / size) * floor(screen_height / size) > size
 ```
 
 A rough approximation can be found quickly by multiplying the width and height of the screen and taking the third root. This will be the maximum value you could reach in an ideal scenario, but the actual value will probably be less.
@@ -62,31 +64,31 @@ floor(2160 / 196) = 11
 
 Some values for common screen resolutions (all of these are for fullscreen):
 
-- **resolution: v**
+- **resolution: size**
 - 1366x768 (768p): 98
-- 1600x900: 112 (This is a case where actual and max values match)
+- 1600x900: 110
 - 1920x1080 (1080p): 120
 - 2560x1080 (ultrawide 1080p): 135
 - 2560x1440 (1440p): 150
 - 3840x2160 (4k): 196
 - 7680x4320 (8k): 312 (Maybe the 2 fps you'll be getting at this resolution isn't worth it)
 
-Once you have `v`, you need to edit some files. Go into the folder of the resource pack (`%appdata%/.minecraft/resourcepacks/<shader name>/`) and find the files
+Once you have `size`, you need to edit some files. Go into the folder of the resource pack (`%appdata%/.minecraft/resourcepacks/<shader name>/`) and find the files
 
 - `assets/minecraft/shaders/include/utils.glsl`
 - `assets/minecraft/shaders/program/raytracer.fsh`
 
-And edit the following 2 lines in **both** files according to v (These should be near the top):
+And edit the following 2 lines in **both** files according to `size` (These should be near the top):
 
 ```glsl
 const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);  // This should be the screen resolution you used earlier
-const float LAYER_SIZE = 88;                            // This should be "v"
+const float LAYER_SIZE = 88;                            // This should be "size"
 ```
 
-You should also edit the following line in raytracer.fsh:
+You should also edit the following line in `raytracer.fsh`:
 
 ```glsl
-const int MAX_STEPS = 200; // Set this to roughly 2-3 times "v"
+const int MAX_STEPS = 200; // Set this to roughly 2-3 times "size"
 ```
 
 The shader should work at this point with the increased view distance.
@@ -99,7 +101,7 @@ The shader should work at this point with the increased view distance.
 
 > Only do this if you know what you are doing. Good rule of thumb: If you don't know if you'll know what you will be doing, you won't.
 
-A couple of values can be configured in `assets/minecraft/shaders/program/raytracer.fsh` for a better effect. Each of these has a huge impact on performance, so make sure you don't burn out your graphcs card.
+A couple of values can be configured in `assets/minecraft/shaders/program/raytracer.fsh` for a better effect. Each of these has a huge impact on performance, so make sure you don't burn out your graphcs card. It's generally not a good idea to increase the first three to more than 2x their original value (so `MAX_GLOBAL_ILLUMINATION_BOUNCES` shouldn't go above 6)
 
 A description of each of these values is included in the following code block:
 
