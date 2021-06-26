@@ -12,10 +12,6 @@ After this, do `/kill @e[type=!player]` twice to make sure nothing's left.
 
 # Vanilla pudding tart - Path tracing shader for vanilla Minecraft 1.17+
 
-## Using this resource pack
-
-Contrary to the name, this pack doesn't have any custom textures (mostly because I'm bad at them), so it uses the vanilla textures. Since those don't have any of the required properties for most of the features (reflections, emission, etc.), they won't show up. To solve this, use [Tart Tin](https://github.com/BalintCsala/TartTin). This requires a LabPBR compatible resource pack, some can be found [here](https://github.com/rre36/lab-pbr/wiki/Resource-Packs).
-
 ## Features
 
 - Path traced global illumination
@@ -28,12 +24,7 @@ Contrary to the name, this pack doesn't have any custom textures (mostly because
 
 This shader only works if the resolution of your monitor exceeds or matches 1024x768 in both directions.
 
-1. Press the green `⤓ Code` button and select "Download ZIP"
-2. Extract the content of the ZIP file to your resource pack folder
-3. Install a resource pack (instructions at [Tart Tin](https://github.com/BalintCsala/TartTin))
-4. Start the game and enter into a world 
-5. Go into video settings and set Graphics to _Fabulous!_
-6. Go into resource packs and enable the path tracing resource pack. Make sure to disable anything else, even if they don't have shaders.
+Unless you know exactly what you are doing, install it through [Tart Tin](https://github.com/BalintCsala/TartTin)
 
 ## Adept mode
 

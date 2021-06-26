@@ -1,2 +1,5 @@
 .idea
 PathTracing.iml
+assets/textures/block
+assets/textures/effect/atlas.png
+assets/models
