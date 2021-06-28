@@ -28,61 +28,7 @@ Unless you know exactly what you are doing, install it through [Tart Tin](https:
 
 ## Adept mode
 
-> It's dangerous to go alone! Take this.
-
-The current view distance is pretty bad (44 blocks in the 3 cardinal directions). This is sadly the limit of the 1024x705 (windowed 768p) minimum resolution I chose.
-
-I can't increase this without removing support for a bunch of people, so if you have a larger screen (which you most likely do) and want better view distance (which you also likely want), you'll need to edit the code a bit.
-
-> Whenever I mention the resolution in the following paragraph, I mean the actual resolution the game is running at. This will only match the monitor resolution when the game is in full screen. You can find the actual resolution on the F3 debug screen in-game on the right side.
-
-The maximum viewable area width (2 x view distance) `size` can be calculated using the following equation, where `screen_width` and `screen_height` are the screen width and height in pixels and `floor` gives you the integer part of a decimal (`floor(5.6) = 5`):
-
-```
-floor(screen_width / size) * floor(screen_height / size) > size
-```
-
-A rough approximation can be found quickly by multiplying the width and height of the screen and taking the third root. This will be the maximum value you could reach in an ideal scenario, but the actual value will probably be less.
-
-For instance:
-A 4k screen (3840x2160) has an area of 8294400 pixels, so the theoretical maximum view area width is 202, but the largest value that satisfies the inequality is 196, therefore the actual value is 196.
-
-```
-floor(3840 / 196) = 19
-floor(2160 / 196) = 11
-11 * 19 = 209 >= 196
-```
-
-Some values for common screen resolutions (all of these are for fullscreen):
-
-- **resolution: size**
-- 1366x768 (768p): 98
-- 1600x900: 110
-- 1920x1080 (1080p): 120
-- 2560x1080 (ultrawide 1080p): 135
-- 2560x1440 (1440p): 150
-- 3840x2160 (4k): 196
-- 7680x4320 (8k): 312 (Maybe the 2 fps you'll be getting at this resolution isn't worth it)
-
-Once you have `size`, you need to edit some files. Go into the folder of the resource pack (`%appdata%/.minecraft/resourcepacks/<shader name>/`) and find the files
-
-- `assets/minecraft/shaders/include/utils.glsl`
-- `assets/minecraft/shaders/program/raytracer.fsh`
-
-And edit the following 2 lines in **both** files according to `size` (These should be near the top):
-
-```glsl
-const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);  // This should be the screen resolution you used earlier
-const float LAYER_SIZE = 88;                            // This should be "size"
-```
-
-You should also edit the following line in `raytracer.fsh`:
-
-```glsl
-const int MAX_STEPS = 200; // Set this to roughly 2-3 times "size"
-```
-
-The shader should work at this point with the increased view distance.
+> Screen resolution is now set through [Tart Tin](https://github.com/BalintCsala/TartTin)
 
 ## Expert mode
 
