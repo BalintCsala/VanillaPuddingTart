@@ -3,7 +3,7 @@
 const float PROJNEAR = 0.05;
 const float FPRECISION = 4000000.0;
 const float EPSILON = 0.001;
-const vec2 vec2(102VOXEL_STORAGE_RESOLUTION = 4, 705);
+const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705); 
 const float LAYER_SIZE = 88;
 const vec2 STORAGE_DIMENSIONS = floor(VOXEL_STORAGE_RESOLUTION / LAYER_SIZE);
 
