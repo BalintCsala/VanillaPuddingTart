@@ -96,12 +96,11 @@ void main() {
 
     float fov = atan(1 / projMat[1][1]);
 
-    /*sunDir = normalize((inverse(modelViewMat) * vec4(
+    sunDir = normalize((inverse(modelViewMat) * vec4(
             decodeFloat(texture(DiffuseSampler, start).xyz),
             decodeFloat(texture(DiffuseSampler, start + inc).xyz),
             decodeFloat(texture(DiffuseSampler, start + 2.0 * inc).xyz),
-            1)).xyz);*/
-    sunDir = normalize(vec3(1, 3, 2));
+            1)).xyz);
 
     mat4 projInv = inverse(projMat * modelViewMat);
     rayDir = (projInv * vec4(outPos.xy * (far - near), far + near, far - near)).xyz;

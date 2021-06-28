@@ -305,15 +305,13 @@ Hit trace(Ray ray, int maxSteps) {
     // of the current block by the signed components of the ray's direction. This way we get the size of the step
     // we need to take to reach a wall in that direction.
     
-    // We also use an SDF to skip checking the blocks for some of the positions
-
-    
-    // Check the current block to see if we're already in one (self-shadows don't work otherwise)
     
     float rayLength = 0;
     float extraLength;
     vec2 texCoord;
     vec3 normal;
+    
+    // Check the current block to see if we're already in one (self-shadows don't work otherwise)
     BlockData blockData = getBlock(ray, texCoord, normal, extraLength);
     if (blockData.type != AIR && extraLength > EPSILON)
         return Hit(rayLength + extraLength, ray.currentBlock, ray.blockPosition + ray.direction * extraLength, normal, blockData, texCoord);

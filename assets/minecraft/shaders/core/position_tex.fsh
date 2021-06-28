@@ -24,19 +24,17 @@ void main() {
     vec4 color = vec4(0.0);
 
     int index = inControl(gl_FragCoord.xy, ScreenSize.x);
-    // currently in a control/message pixel
+    
     if(index != -1) {
-        // store the sun position in eye space indices [0,2]
         if (isSun > 0.75 && index >= 0 && index <= 2) {
             vec4 sunDir = vec4(normalize(c1 / cscale.x + c3 / cscale.z), 0.0);
             color = vec4(encodeFloat(sunDir[index]), 1.0);
-        }
-        else if (isSun < 0.25) {
+        } else if (isSun < 0.25) {
             color = texture(Sampler0, texCoord0) * ColorModulator;
         } else {
             discard;
         }
-    } else if(isSun > 0.5) {
+    } else if(isSun > 0.75) {
         discard;
     } else {
         color = texture(Sampler0, texCoord0) * ColorModulator;

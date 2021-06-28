@@ -101,7 +101,7 @@ A description of each of these values is included in the following code block:
 const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
 // This will determine how many bounces a GI ray is allowed to do to calculate the light level at a pixel (complexity: O(N^2))
 const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
-// This will determine the amount of reflection bounces a ray will do, if you increase it, mirror rooms will be better (complexity: O(N^˘3))
+// This will determine the amount of reflection bounces a ray will do, if you increase it, mirror rooms will be better (complexity: O(N^3))
 const int MAX_REFLECTION_BOUNCES = 10;
 // The color of the sun multiplied by intensity
 const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
