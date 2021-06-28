@@ -168,7 +168,7 @@ vec2 blockToTexCoord(vec3 position) {
     position += LAYER_SIZE / 2;
     // We store the blocks in layers
     vec2 inLayerPos = position.xz;
-    vec2 layerStart = vec2(mod(position.y, STORAGE_DIMENSIONS.y), floor(position.y / STORAGE_DIMENSIONS.y)) * LAYER_SIZE;
+    vec2 layerStart = vec2(mod(position.y, STORAGE_DIMENSIONS.x), floor(position.y / STORAGE_DIMENSIONS.x)) * LAYER_SIZE;
     return (layerStart + inLayerPos + vec2(0.5, 1.5)) / (VOXEL_STORAGE_RESOLUTION - 1);
 }
 

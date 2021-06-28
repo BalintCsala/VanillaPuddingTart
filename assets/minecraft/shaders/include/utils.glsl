@@ -27,7 +27,7 @@ vec2 blockToPixel(vec3 position) {
     // Therefore the position inside a layer is just the position of the block on the xz plane relative to the player.
     vec2 inLayerPos = position.xz + LAYER_SIZE / 2;
     // There are 60 layers, we store them in an 8x8 area.
-    vec2 layerStart = vec2(mod(position.y + LAYER_SIZE / 2, STORAGE_DIMENSIONS.y), floor((position.y + LAYER_SIZE / 2) / STORAGE_DIMENSIONS.y)) * LAYER_SIZE;
+    vec2 layerStart = vec2(mod(position.y + LAYER_SIZE / 2, STORAGE_DIMENSIONS.x), floor((position.y + LAYER_SIZE / 2) / STORAGE_DIMENSIONS.x)) * LAYER_SIZE;
     // We offset it by 1 pixel in the y direction, because we store the matrices there
     return layerStart + inLayerPos + vec2(0, 1);
 }

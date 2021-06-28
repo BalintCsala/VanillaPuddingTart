@@ -3,7 +3,7 @@
 const float PROJNEAR = 0.05;
 const float FPRECISION = 4000000.0;
 const float EPSILON = 0.001;
-const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
+const vec2 vec2(102VOXEL_STORAGE_RESOLUTION = 4, 705);
 const float LAYER_SIZE = 88;
 const vec2 STORAGE_DIMENSIONS = floor(VOXEL_STORAGE_RESOLUTION / LAYER_SIZE);
 
@@ -36,7 +36,7 @@ vec2 blockToPixel(vec3 position) {
     // Therefore the position inside a layer is just the position of the block on the xz plane relative to the player.
     vec2 inLayerPos = position.xz + LAYER_SIZE / 2;
     // There are 60 layers, we store them in an 8x8 area.
-    vec2 layerStart = vec2(mod(position.y + LAYER_SIZE / 2, STORAGE_DIMENSIONS.y), floor((position.y + LAYER_SIZE / 2) / STORAGE_DIMENSIONS.y)) * LAYER_SIZE;
+    vec2 layerStart = vec2(mod(position.y + LAYER_SIZE / 2, STORAGE_DIMENSIONS.x), floor((position.y + LAYER_SIZE / 2) / STORAGE_DIMENSIONS.x)) * LAYER_SIZE;
     // The 0.5 offset is to read the center of the "pixels", the +1 offset on the y is to not interfere with the control line
     return layerStart + inLayerPos + vec2(0.5, 1.5);
 }
