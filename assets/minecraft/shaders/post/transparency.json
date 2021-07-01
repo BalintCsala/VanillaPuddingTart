@@ -42,6 +42,13 @@
                     "width": 1,
                     "height": 1,
                     "bilinear": false
+                },
+                {
+                    "name": "AtmosphereSampler",
+                    "id": "atmosphere",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": true
                 }
             ]
         },

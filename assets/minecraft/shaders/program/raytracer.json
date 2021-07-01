@@ -12,7 +12,8 @@
         { "name": "AtlasSampler" },
         { "name": "SteveSampler" },
         { "name": "PreviousFrameDataSampler" },
-        { "name": "NoiseSampler" }
+        { "name": "NoiseSampler" },
+        { "name": "AtmosphereSampler" }
     ],
     "uniforms": [
         { "name": "ProjMat",    "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },

@@ -25,7 +25,8 @@ const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
 const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
 const int MAX_REFLECTION_BOUNCES = 10;
 const vec3 SUN_COLOR = pow(1.0 * vec3(1.0, 0.95, 0.8), vec3(GAMMA_CORRECTION));
-const vec3 SKY_COLOR = pow(2.0 * vec3(0.2, 0.35, 0.5), vec3(GAMMA_CORRECTION));
+const vec3 MOON_COLOR = pow(0.5 * vec3(0.8, 0.8, 0.9), vec3(GAMMA_CORRECTION));
+const float SKY_INTENSITY = 2.0;
 const float SUN_ANGULAR_SIZE = 0.01;
 const float MAX_EMISSION_STRENGTH = 5;
 
@@ -36,6 +37,7 @@ uniform sampler2D AtlasSampler;
 uniform sampler2D SteveSampler;
 // Blue noise from http://momentsingraphics.de/BlueNoise.html
 uniform sampler2D NoiseSampler;
+uniform sampler2D AtmosphereSampler;
 
 uniform vec2 OutSize;
 uniform float Time;
@@ -191,13 +193,21 @@ const vec3 PREDETERMINED_F0[] = vec3[](
 
 vec3 decodeF0(float stored, vec3 albedo) {
     if (stored < 230.0 / 255)
-        return vec3(stored / 255);
+        return vec3(stored / 255); 
     
     if (stored > 254.0 / 255)
         return albedo;
     
     int index = int(stored * 255) - 230;
     return PREDETERMINED_F0[index];
+}
+
+vec3 skyColor(vec3 direction) {
+    vec2 texcoord = vec2(
+        dot(direction, vec3(0, 1, 0)) * 0.5 + 0.5,
+        dot(sunDir, vec3(0, 1, 0)) * 0.5 + 0.5
+    ) * 0.999;
+    return pow(texture(AtmosphereSampler, texcoord).rgb * SKY_INTENSITY, vec3(GAMMA_CORRECTION));
 }
 
 // Returns the block data for the block at the specified position
@@ -385,8 +395,8 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
     vec3 accumulated = vec3(0.0);
     vec3 weight = vec3(1.0);
 
-    Ray sunRay;
-    Hit sunlightHit;
+    Ray sunRay, moonRay;
+    Hit sunlightHit, moonlightHit;
     for (int steps = 0; steps < MAX_GLOBAL_ILLUMINATION_BOUNCES; steps++) {
         // After each bounce, change the base color
         weight *= hit.blockData.albedo * (1 - fresnel(hit.blockData.F0, 1 - dot(ray.direction, hit.normal)));
@@ -394,26 +404,36 @@ vec3 globalIllumination(Hit hit, Ray ray, float traceSeed) {
         // Summon rays
         vec3 direction = randomDirection(texCoord, hit.normal, float(steps) * 754.54 + traceSeed, 1.0);
         vec3 sunDirection = randomDirection(texCoord, sunDir, float(steps) + 823.375 + traceSeed, SUN_ANGULAR_SIZE);
-        float NdotL = max(dot(sunDir, hit.normal), 0.0);
+        float NdotL = dot(sunDir, hit.normal);
+        float sunContrib = sqrt(max(NdotL, 0.0));
+        float moonContrib = sqrt(max(-NdotL, 0.0));
 
         ray = Ray(hit.block, hit.blockPosition, direction);
         sunRay = Ray(hit.block, hit.blockPosition, sunDirection);
+        moonRay = Ray(hit.block, hit.blockPosition, -sunDirection);
 
         // Path tracing
         hit = trace(ray, MAX_STEPS);
         sunlightHit = trace(sunRay, MAX_STEPS);
+        moonlightHit = trace(moonRay, MAX_STEPS);
 
         accumulated += hit.blockData.emission.rgb * MAX_EMISSION_STRENGTH * hit.blockData.emission.a * weight;
-        accumulated += sqrt(NdotL) * step(sunlightHit.traceLength, EPSILON) * SUN_COLOR * weight;
+        accumulated += sunContrib * step(sunlightHit.traceLength, EPSILON) * SUN_COLOR * weight;
+        accumulated += moonContrib * step(moonlightHit.traceLength, EPSILON) * MOON_COLOR * weight;
 
         if (hit.traceLength < EPSILON) {
             // Didn't hit a block, we'll draw the sky
-            accumulated += SKY_COLOR * weight;
+            accumulated += skyColor(ray.direction) * weight;
             break;
         }
     }
 
     return accumulated;
+}
+
+float getSunFactor(vec3 direction) {
+    float fac = smoothstep(0.9991, 0.99995, dot(direction, sunDir));
+    return fac * fac;
 }
 
 // Main path tracing code
@@ -428,8 +448,8 @@ vec3 pathTrace(Ray ray, out float depth) {
     if (hit.traceLength < EPSILON) {
         // We didn't hit anything
         depth = far;
-        float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
-        return sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR * weight;
+        float sunFactor = getSunFactor(ray.direction);
+        return sunFactor * SUN_COLOR + (1 - sunFactor) * skyColor(ray.direction) * weight;
     }
 
     // Global Illumination
@@ -450,9 +470,11 @@ vec3 pathTrace(Ray ray, out float depth) {
 
         if (hit.traceLength < EPSILON) {
             // We didn't hit anything
-            accumulated += SKY_COLOR * weight;
-            float sunFactor = smoothstep(0.9987, 0.999, dot(ray.direction, sunDir));
-            accumulated += (sunFactor * SUN_COLOR + (1 - sunFactor) * SKY_COLOR) * weight;
+            vec3 skyCol = skyColor(ray.direction);
+            accumulated += skyCol * weight;
+            float sunFactor = getSunFactor(ray.direction);
+            sunFactor *= sunFactor;
+            accumulated += (sunFactor * SUN_COLOR + (1 - sunFactor) * skyCol) * weight;
             break;
         }
         // Global Illumination in reflecton
