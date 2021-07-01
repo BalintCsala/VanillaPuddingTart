@@ -10,7 +10,9 @@ After this, do `/kill @e[type=!player]` twice to make sure nothing's left.
 
 (You'll want to avoid any lava. If you see random blocks or full layers popping into existence and back, it's either lava or entities)
 
-# Vanilla pudding tart - Path tracing shader for vanilla Minecraft 1.17+
+# Vanilla pudding tart 
+
+Path tracing shader for vanilla Minecraft 1.17+
 
 ## Features
 
@@ -19,20 +21,11 @@ After this, do `/kill @e[type=!player]` twice to make sure nothing's left.
 - Reflections
 - Emission (= light sources work as they should)
 - Configurable F0, metallicity and roughness factors
+- Atmospheric effects
 
 ## How to install
 
-This shader only works if the resolution of your monitor exceeds or matches 1024x768 in both directions.
-
 Unless you know exactly what you are doing, install it through [Tart Tin](https://github.com/BalintCsala/TartTin)
-
-## Adept mode
-
-> Screen resolution is now set through [Tart Tin](https://github.com/BalintCsala/TartTin)
-
-## Expert mode
-
-> Textures are now generated, please refer to [Tart Tin](https://github.com/BalintCsala/TartTin)
 
 ## Pro mode
 
@@ -60,9 +53,7 @@ const float MAX_EMISSION_STRENGTH = 5;
 ## Examples
 
 These images were taken without any noise reduction. Looks less noisy in-game.
-
-![example1](images/gi-example1.png)
-
-![example2](images/gi-example2.png)
-
-![example3](images/gi-example3.png)
+![](images/example1.png)
+![](images/example2.png)
+![](images/example3.png)
+(oCd PBR was used for this image)
