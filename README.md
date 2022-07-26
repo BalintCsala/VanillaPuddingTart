@@ -1,6 +1,6 @@
 # ❗ <ins>Before you try it out, read this!</ins> ❗
 
-This shader only works prior to 1.18.2 (in other words, 1.18.1 or earlier)
+This shader only works prior to 1.18.2 (in other words, 1.18.1 or earlier), the graphics option has to be on Faboulous.
 
 This shader is WIP, therefore it lacks many features, including complete support for some of the blocks and all entities. If you want to try it out (although it's not necessary), play in a void or superflat world. Regardless of what you use, set the following game rules:
 
