@@ -3,8 +3,8 @@
 // I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
 // This should just barely fit 8, 88 deep layers vertically (8 * 88 + 1 control line = 705)
 // I want to keep the stored layers square, therefore I only use 88 * 11 = 968 pixels horizontally
-const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1024, 705);
-const float LAYER_SIZE = 88;
+const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1278, 1008);
+const float LAYER_SIZE = 106;
 
 // Block types
 #define AIR             0u
@@ -20,7 +20,7 @@ const float SQRT_2 = 1.4142135;
 const float EPSILON = 0.00001;
 
 const float GAMMA_CORRECTION = 2.2;
-const int MAX_STEPS = 100;
+const int MAX_STEPS = 265;
 const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
 const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
 const int MAX_REFLECTION_BOUNCES = 10;

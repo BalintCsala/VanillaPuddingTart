@@ -1,6 +1,6 @@
 {
    "pack": {
-      "pack_format": 7,
-      "description": "Path tracing"
+      "pack_format": 9,
+      "description": "Path tracing shader for vanilla minecraft"
    }
 }

@@ -1,6 +1,6 @@
 # ❗ <ins>Before you try it out, read this!</ins> ❗
 
-This shader only works prior to 1.18.2 (in other words, 1.18.1 or earlier), the graphics option has to be on Faboulous.
+**The graphics option has to be on _Fabulous!_.** (Escape -> Settings -> Video settings -> Graphics: ...)
 
 This shader is WIP, therefore it lacks many features, including complete support for some of the blocks and all entities. If you want to try it out (although it's not necessary), play in a void or superflat world. Regardless of what you use, set the following game rules:
 
@@ -8,11 +8,11 @@ This shader is WIP, therefore it lacks many features, including complete support
 doMobSpawning false
 doTileDrops false
 ```
-After this, do `/kill @e[type=!player]` twice to make sure nothing's left.
+After this, do `/kill @e[type=!player]` twice to make sure nothing's left. Since entities are not supported (and break the shader), this ensures that nothing you do will create one accidentally.
 
 (You'll want to avoid any lava. If you see random blocks or full layers popping into existence and back, it's either lava or entities)
 
-# Vanilla pudding tart 
+# Vanilla Pudding Tart (**V**anilla **P**ath **T**racing)
 
 Path tracing shader for vanilla Minecraft 1.17+
 
