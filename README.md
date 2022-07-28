@@ -1,3 +1,5 @@
+If you like this shader, consider supporting me on [patreon](https://www.patreon.com/balintshaders)
+
 # ❗ <ins>Before you try it out, read this!</ins> ❗
 
 **The graphics option has to be on _Fabulous!_.** (Escape -> Settings -> Video settings -> Graphics: ...)
