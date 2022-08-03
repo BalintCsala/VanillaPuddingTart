@@ -1,4 +1,10 @@
-If you like this shader, consider supporting me on [patreon](https://www.patreon.com/balintshaders)
+# Update
+
+This shader was largely superceded by a new version, which is actually gameplay-friendly. Check it out on [my patreon](https://www.patreon.com/balintshaders) (new versions are early access to patrons).
+
+# Old stuff
+
+If you like this shader, consider supporting me on
 
 # ❗ <ins>Before you try it out, read this!</ins> ❗
 
