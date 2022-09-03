@@ -1,69 +1,13 @@
-# Update
+# Installation
 
-This shader was largely superceded by a new version, which is actually gameplay-friendly. Check it out on [my patreon](https://www.patreon.com/balintshaders) (new versions are early access to patrons).
+If you just intend to use the shader, **do not** download it from here. This repository only serves as a place to store the source code in case anyone would like to study it in some way. Instead go to [my patreon](https://www.patreon.com/balintshaders) (versions are available early to patreons and become public after a month). Installation instructions can be found [here](https://www.patreon.com/posts/vpt-2-early-test-69912873)
 
-# Old stuff
+# About the shader
 
-If you like this shader, consider supporting me on
+The aim of this shader is to implement path tracing (a way to calculate global illumination) without any third party mods, only using the built-in shader pipeline Minecraft provides.
 
-# ❗ <ins>Before you try it out, read this!</ins> ❗
+The name (VanillaPuddingTart) is an abbreviated and (badly) unabbreviated version of vanilla path tracing.
 
-**The graphics option has to be on _Fabulous!_.** (Escape -> Settings -> Video settings -> Graphics: ...)
+# Support me
 
-This shader is WIP, therefore it lacks many features, including complete support for some of the blocks and all entities. If you want to try it out (although it's not necessary), play in a void or superflat world. Regardless of what you use, set the following game rules:
-
-```
-doMobSpawning false
-doTileDrops false
-```
-After this, do `/kill @e[type=!player]` twice to make sure nothing's left. Since entities are not supported (and break the shader), this ensures that nothing you do will create one accidentally.
-
-(You'll want to avoid any lava. If you see random blocks or full layers popping into existence and back, it's either lava or entities)
-
-# Vanilla Pudding Tart (**V**anilla **P**ath **T**racing)
-
-Path tracing shader for vanilla Minecraft 1.17+
-
-## Features
-
-- Path traced global illumination
-- Shadows
-- Reflections
-- Emission (= light sources work as they should)
-- Configurable F0, metallicity and roughness factors
-- Atmospheric effects
-
-## How to install
-
-Unless you know exactly what you are doing, install it through [Tart Tin](https://github.com/BalintCsala/TartTin)
-
-## Pro mode
-
-> Only do this if you know what you are doing. Good rule of thumb: If you don't know if you'll know what you will be doing, you won't.
-
-A couple of values can be configured in `assets/minecraft/shaders/program/raytracer.fsh` for a better effect. Each of these has a huge impact on performance, so make sure you don't burn out your graphcs card. It's generally not a good idea to increase the first three to more than 2x their original value (so `MAX_GLOBAL_ILLUMINATION_BOUNCES` shouldn't go above 6)
-
-A description of each of these values is included in the following code block:
-
-```glsl
-// This determines how many steps (approx. blocks) the GI ray will go through to check bounce lighting (complexity: O(N))
-const int MAX_GLOBAL_ILLUMINATION_STEPS = 10;
-// This will determine how many bounces a GI ray is allowed to do to calculate the light level at a pixel (complexity: O(N^2))
-const int MAX_GLOBAL_ILLUMINATION_BOUNCES = 3;
-// This will determine the amount of reflection bounces a ray will do, if you increase it, mirror rooms will be better (complexity: O(N^3))
-const int MAX_REFLECTION_BOUNCES = 10;
-// The color of the sun multiplied by intensity
-const vec3 SUN_COLOR = 1.0 * vec3(1.0, 0.95, 0.8);
-// The color of the sky multiplied by intensity. This also affects ambient lighting
-const vec3 SKY_COLOR = 1 * vec3(0.2, 0.35, 0.5);
-// The maximum strength of emissive materials, larger values will result in coarser individual steps, but larger maximums
-const float MAX_EMISSION_STRENGTH = 5;
-```
-
-## Examples
-
-These images were taken without any noise reduction. Looks less noisy in-game.
-![](images/example1.png)
-![](images/example2.png)
-![](images/example3.png)
-(oCd PBR was used for this image)
+If you like this shader and want to support it, please consider [becoming my patron](https://www.patreon.com/balintshaders). 

@@ -12,10 +12,12 @@ uniform vec4 ColorModulator;
 
 out float vertexDistance;
 flat out vec4 vertexColor;
+out vec4 glpos;
 
 void main() {
     gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
 
     vertexDistance = length((ModelViewMat * vec4(Position, 1.0)).xyz);
     vertexColor = Color * ColorModulator * texelFetch(Sampler2, UV2 / 16, 0);
+    glpos = gl_Position;
 }

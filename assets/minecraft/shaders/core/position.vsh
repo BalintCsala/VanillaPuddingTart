@@ -1,27 +1,27 @@
 #version 150
 
-#moj_import <utils.glsl>
-
 in vec3 Position;
 
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
+uniform float FogEnd;
 
+out mat4 ProjInv;
 out float isSky;
-out vec4 glpos;
+out float vertexDistance;
 
-const float BOTTOM = -32.0;
-const float SCALE = 0.01;
-const float SKYHEIGHT = 16.0;
-const float SKYRADIUS = 512.0;
-const float FUDGE = 0.004;
+#define BOTTOM -32.0
+#define SCALE 0.01
+#define SKYHEIGHT 16.0
+#define SKYRADIUS 512.0
+#define FUDGE 0.004
 
 void main() {
-    // "position.vsh" is only responsible for the sky.
-    // We will use it for two things, we can give the background a constant white color and we can also pass some
-    // crucial information to the post shaders (the model-view and the projection matrices).
-    // Code is from the sun-position shader from thebbq https://github.com/bradleyq/shader-toolkit/blob/main/sun-position
     vec3 scaledPos = Position;
+    isSky = 0.0;
+
+    // the sky is transformed so that it always covers the entire camera view. Guarantees that we can write to control pixels in fsh.
+    // sky disk is by default 16.0 units above with radius of 512.0 around the camera at all times.
     if (abs(scaledPos.y  - SKYHEIGHT) < FUDGE && (length(scaledPos.xz) <= FUDGE || abs(length(scaledPos.xz) - SKYRADIUS) < FUDGE)) {
         isSky = 1.0;
 
@@ -42,4 +42,7 @@ void main() {
     } else {
         gl_Position = ProjMat * ModelViewMat * vec4(scaledPos, 1.0);
     }
+
+    ProjInv = inverse(ProjMat * ModelViewMat);
+    vertexDistance = length((ModelViewMat * vec4(Position, 1.0)).xyz);
 }

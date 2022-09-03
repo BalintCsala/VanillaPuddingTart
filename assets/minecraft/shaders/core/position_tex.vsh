@@ -6,6 +6,7 @@ in vec2 UV0;
 uniform sampler2D Sampler0;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
+uniform mat3 IViewRotMat;
 
 out mat4 ProjInv;
 out vec3 cscale;
@@ -19,6 +20,14 @@ out float isSun;
 #define SUNDIST 110
 #define OVERLAYSCALE 2.0
 
+const float OFFSET_ANGLE = 25.0;
+
+const mat3 OFFSET_ROTATION = mat3(
+    1, 0, 0,
+    0, cos(radians(OFFSET_ANGLE)), sin(radians(OFFSET_ANGLE)),
+    0, -sin(radians(OFFSET_ANGLE)), cos(radians(OFFSET_ANGLE))
+);
+
 void main() {
     vec4 candidate = ProjMat * ModelViewMat * vec4(Position, 1.0);
     ProjInv = mat4(0.0);
@@ -31,31 +40,33 @@ void main() {
 
     // test if sun or moon. Position.y limit excludes worldborder.
     if (Position.y < SUNDIST  && Position.y > -SUNDIST && (ModelViewMat * vec4(Position, 1.0)).z > -SUNDIST) {
+        // Rotate the sun to avoid shadow glitches
+        vec3 pos = (OFFSET_ROTATION * (IViewRotMat * Position)) * IViewRotMat;
 
         // only the sun has a square texture
         if (tsize.x == tsize.y) {
             isSun = 1.0;
             candidate = vec4(-2.0 * OVERLAYSCALE, -OVERLAYSCALE, 0.0, 1.0);
-
+            
             // modify position of sun so that it covers the entire screen and store c1, c2, c3 so player space position of sun can be extracted in fsh.
             // this is the key to get everything working since it guarantees that we can access sun info in the control pixels in fsh.
             if (UV0.x < 0.5) {
-                c1 = Position;
+                c1 = pos;
                 cscale.x = 1.0;
             } else {
                 candidate.x = OVERLAYSCALE;
                 if (UV0.y < 0.5) {
-                    c2 = Position;
+                    c2 = pos;
                     cscale.y = 1.0;
                 } else {
                     candidate.y = 2.0 * OVERLAYSCALE;
-                    c3 = Position;
+                    c3 = pos;
                     cscale.z = 1.0;
                 }
             }
             ProjInv = inverse(ProjMat * ModelViewMat);
         } else {
-            isSun = 0.75;
+            isSun = 0.5;
         }
     }
 

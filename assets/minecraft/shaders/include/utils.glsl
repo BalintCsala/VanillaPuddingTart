@@ -1,49 +1,96 @@
 #version 150
 
-// I'm targeting anything beyond 1024x768, without the taskbar, that let's us use 1024x705 pixels
-// This should just barely fit 8, 88 deep layers (8 * 88 + 1 control line = 705)
-// I want to keep the stored layers square, therefore I only use 88 * 11 = 968 pixels horizontally
-const vec2 VOXEL_STORAGE_RESOLUTION = vec2(1278, 1008);
-const float LAYER_SIZE = 106;
+#define NUMCONTROLS 26
+#define THRESH 0.5
+#define FPRECISION 4000000.0
+#define PROJNEAR 0.05
 
-const float EPSILON = 0.01;
-const float FPRECISION = 4000000.0;
-const float NUMCONTROLS = 200;
-const float THRESH = 0.5;
-const float PROJNEAR = 0.05;
+/*
+Control Map:
+[0] sunDir.x
+[1] sunDir.y
+[2] sunDir.z
+[3] arctan(ProjMat[0][0])
+[4] arctan(ProjMat[1][1])
+[5] ProjMat[1][0]
+[6] ProjMat[0][1]
+[7] ProjMat[1][2]
+[8] ProjMat[1][3]
+[9] ProjMat[2][0]
+[10] ProjMat[2][1]
+[11] ProjMat[2][2]
+[12] ProjMat[2][3]
+[13] ProjMat[3][0]
+[14] ProjMat[3][1]
+[15] ProjMat[3][2]
+[16] ModelViewMat[0][0]
+[17] ModelViewMat[0][1]
+[18] ModelViewMat[0][2]
+[19] ModelViewMat[1][0]
+[20] ModelViewMat[1][1]
+[21] ModelViewMat[1][2]
+[22] ModelViewMat[2][0]
+[23] ModelViewMat[2][1]
+[24] ModelViewMat[2][2]
+[25] FogColor
+*/
 
-const vec2 STORAGE_DIMENSIONS = floor(VOXEL_STORAGE_RESOLUTION / LAYER_SIZE);
-
-int imod(int val, int m) {
-    return val - val / m * m;
+ivec2 getScreenSize(vec2 fragCoord, vec4 glpos) {
+    return ivec2(round(fragCoord * 2.0 / (glpos.xy / glpos.w + 1.0)));
 }
 
-vec2 pixelToTexCoord(vec2 pixel) {
-    return pixel / (VOXEL_STORAGE_RESOLUTION - 1);
+// returns control pixel index or -1 if not control
+int inControl(vec2 screenCoord, float screenWidth) {
+    if (screenCoord.y < 1.0) {
+        float index = floor(screenWidth / 2.0) + THRESH / 2.0;
+        index = (screenCoord.x - index) / 2.0;
+        if (fract(index) < THRESH && index < NUMCONTROLS && index >= 0) {
+            return int(index);
+        }
+    }
+    return -1;
 }
 
-vec2 blockToPixel(vec3 position) {
-    // The block data is split into layers. Each layer is 60x60 blocks and represents a single y height.
-    // Therefore the position inside a layer is just the position of the block on the xz plane relative to the player.
-    vec2 inLayerPos = position.xz + LAYER_SIZE / 2;
-    // There are 60 layers, we store them in an 8x8 area.
-    vec2 layerStart = vec2(mod(position.y + LAYER_SIZE / 2, STORAGE_DIMENSIONS.x), floor((position.y + LAYER_SIZE / 2) / STORAGE_DIMENSIONS.x)) * LAYER_SIZE;
-    // We offset it by 1 pixel in the y direction, because we store the matrices there
-    return layerStart + inLayerPos + vec2(0, 1);
+// discards the current pixel if it is control
+void discardControl(vec2 screenCoord, float screenWidth) {
+    if (screenCoord.y < 1.0) {
+        float index = floor(screenWidth / 2.0) + THRESH / 2.0;
+        index = (screenCoord.x - index) / 2.0;
+        if (fract(index) < THRESH && index < NUMCONTROLS && index >= 0) {
+            discard;
+        }
+    }
 }
 
-vec2 blockToTexCoord(vec3 position) {
-    return pixelToTexCoord(blockToPixel(position));
+// discard but for when ScreenSize is not given
+void discardControlGLPos(vec2 screenCoord, vec4 glpos) {
+    if (screenCoord.y < 1.0) {
+        float screenWidth = round(screenCoord.x * 2.0 / (glpos.x / glpos.w + 1.0));
+        float index = floor(screenWidth / 2.0) + THRESH / 2.0;
+        index = (screenCoord.x - index) / 2.0;
+        if (fract(index) < THRESH && index < NUMCONTROLS && index >= 0) {
+            discard;
+        }
+    }
+}
+
+// get screen coordinates of a particular control index
+vec2 getControl(int index, vec2 screenSize) {
+    return vec2(floor(screenSize.x / 2.0) + float(index) * 2.0 + 0.5, 0.5) / screenSize;
+}
+
+int intmod(int i, int base) {
+    return i - (i / base * base);
 }
 
 vec3 encodeInt(int i) {
     int s = int(i < 0) * 128;
     i = abs(i);
-    int r = imod(i, 256);
+    int r = intmod(i, 256);
     i = i / 256;
-    int g = imod(i, 256);
+    int g = intmod(i, 256);
     i = i / 256;
-    int b = imod(i, 128);
+    int b = intmod(i, 128);
     return vec3(float(r) / 255.0, float(g) / 255.0, float(b + s) / 255.0);
 }
 
@@ -59,28 +106,4 @@ vec3 encodeFloat(float i) {
 
 float decodeFloat(vec3 ivec) {
     return decodeInt(ivec) / FPRECISION;
-}
-
-// returns control pixel index or -1 if not control
-int inControl(vec2 screenCoord, float screenWidth) {
-    if (screenCoord.y < 1) {
-        float index = floor(screenWidth / 2.0) + THRESH / 2.0;
-        index = (screenCoord.x - index) / 2.0;
-        if (fract(index) < THRESH && index < NUMCONTROLS && index >= 0) {
-            return int(index);
-        }
-    }
-    return -1;
-}
-
-int inControl(vec2 screenCoord, vec4 glpos) {
-    if (screenCoord.y < 1.0) {
-        float screenWidth = round(screenCoord.x * 2.0 / (glpos.x / glpos.w + 1.0));
-        float index = floor(screenWidth / 2.0) + THRESH / 2.0;
-        index = (screenCoord.x - index) / 2.0;
-        if (fract(index) < THRESH && index < NUMCONTROLS && index >= 0) {
-            return int(index);
-        }
-    }
-    return -1;
 }

@@ -1,30 +1,83 @@
 {
     "targets": [
+        "solid",
+        "result",
+        "denoised",
         "water",
         "translucent",
         "itemEntity",
         "particles",
         "clouds",
         "weather",
-        "previousFrame",
-        "previousData",
-        "pathtraced",
-        "denoised",
-        "combined"
+        "translucent_decheckered",
+        "particles_decheckered",
+        "itemEntity_decheckered",
+        "final",
+        { "name": "counter", "width": 200, "height": 200 },
+        { "name": "counter_swap", "width": 200, "height": 200 },
+        "prev_data",
+        "prev_denoised"
     ],
     "passes": [
         {
-            "name": "raytracer",
+            "name": "counter",
+            "intarget": "counter",
+            "outtarget": "counter_swap"
+        },
+        {
+            "name": "blit",
+            "intarget": "counter_swap",
+            "outtarget": "counter"  
+        },
+        {
+            "name": "de_checkerboard",
             "intarget": "minecraft:main",
-            "outtarget": "pathtraced",
+            "outtarget": "solid",
             "auxtargets": [
                 {
-                    "name": "PreviousFrameDataSampler",
-                    "id": "previousData"
+                    "name": "DiffuseDepthSampler",
+                    "id": "minecraft:main:depth"
+                }
+            ]
+        },
+        {
+            "name": "path_tracer",
+            "intarget": "solid",
+            "outtarget": "result",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "solid:depth"
                 },
                 {
-                    "name": "AtlasSampler",
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                },
+                {
+                    "name": "DataDepthSampler",
+                    "id": "minecraft:main:depth"
+                },
+                {
+                    "name": "CounterSampler",
+                    "id": "counter"
+                },
+                {
+                    "name": "AlbedoAtlas",
                     "id": "atlas",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": false
+                },
+                {
+                    "name": "NormalAtlas",
+                    "id": "atlas_normal",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": false
+                },
+                {
+                    "name": "SpecularAtlas",
+                    "id": "atlas_specular",
                     "width": 1,
                     "height": 1,
                     "bilinear": false
@@ -35,98 +88,101 @@
                     "width": 1,
                     "height": 1,
                     "bilinear": false
-                },
-                {
-                    "name": "NoiseSampler",
-                    "id": "noise",
-                    "width": 1,
-                    "height": 1,
-                    "bilinear": false
-                },
-                {
-                    "name": "AtmosphereSampler",
-                    "id": "atmosphere",
-                    "width": 1,
-                    "height": 1,
-                    "bilinear": true
                 }
             ]
         },
         {
-            "name": "denoiser",
-            "intarget": "pathtraced",
+            "name": "taa",
+            "intarget": "result",
             "outtarget": "denoised",
             "auxtargets": [
                 {
-                    "name": "CurrentFrameDataSampler",
+                    "name": "DiffuseDepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "PrevResultSampler",
+                    "id": "prev_denoised"
+                },
+                {
+                    "name": "PrevResultDepthSampler",
+                    "id": "prev_denoised:depth"
+                },
+                {
+                    "name": "DataSampler",
                     "id": "minecraft:main"
                 },
                 {
-                    "name": "CurrentFrameDepthSampler",
-                    "id": "pathtraced:depth"
-                },
-                {
-                    "name": "PreviousFrameSampler",
-                    "id": "previousFrame"
-                },
-                {
-                    "name": "PreviousFrameDataSampler",
-                    "id": "previousData"
-                },
-                {
-                    "name": "PreviousFrameDepthSampler",
-                    "id": "previousFrame:depth"
+                    "name": "PrevDataSampler",
+                    "id": "prev_data"
                 }
             ]
         },
         {
-            "name": "copy_with_depth",
-            "intarget": "denoised",
-            "outtarget": "previousFrame",
+            "name": "de_checkerboard",
+            "intarget": "translucent",
+            "outtarget": "translucent_decheckered",
             "auxtargets": [
                 {
-                    "name": "DepthSampler",
-                    "id": "pathtraced:depth"
+                    "name": "DiffuseDepthSampler",
+                    "id": "translucent:depth"
                 }
             ]
         },
         {
-            "name": "blit",
-            "intarget": "minecraft:main",
-            "outtarget": "previousData"
+            "name": "de_checkerboard",
+            "intarget": "particles",
+            "outtarget": "particles_decheckered",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "particles:depth"
+                }
+            ]
+        },
+        {
+            "name": "de_checkerboard",
+            "intarget": "itemEntity",
+            "outtarget": "itemEntity_decheckered",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "itemEntity:depth"
+                }
+            ]
         },
         {
             "name": "transparency",
             "intarget": "denoised",
-            "outtarget": "combined",
+            "outtarget": "final",
             "auxtargets": [
                 {
                     "name": "DiffuseDepthSampler",
-                    "id": "pathtraced:depth"
+                    "id": "solid:depth"
                 },
                 {
                     "name": "TranslucentSampler",
-                    "id": "translucent"
+                    "id": "translucent_decheckered"
                 },
                 {
                     "name": "TranslucentDepthSampler",
-                    "id": "translucent:depth"
+                    "id": "translucent_decheckered:depth"
                 },
                 {
                     "name": "ItemEntitySampler",
-                    "id": "itemEntity"
+                    "id": "itemEntity_decheckered"
                 },
                 {
                     "name": "ItemEntityDepthSampler",
-                    "id": "itemEntity:depth"
+                    "id": "itemEntity_decheckered:depth"
                 },
                 {
                     "name": "ParticlesSampler",
-                    "id": "particles"
+                    "id": "particles_decheckered"
                 },
                 {
                     "name": "ParticlesDepthSampler",
-                    "id": "particles:depth"
+                    "id": "particles_decheckered:depth"
                 },
                 {
                     "name": "CloudsSampler",
@@ -147,8 +203,30 @@
             ]
         },
         {
+            "name": "copy_with_depth",
+            "intarget": "denoised",
+            "outtarget": "prev_denoised",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                }
+            ]
+        },
+        {
+            "name": "copy_with_depth",
+            "intarget": "minecraft:main",
+            "outtarget": "prev_data",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "minecraft:main:depth"
+                }
+            ]
+        },
+        {
             "name": "blit",
-            "intarget": "combined",
+            "intarget": "final",
             "outtarget": "minecraft:main"
         }
     ]
