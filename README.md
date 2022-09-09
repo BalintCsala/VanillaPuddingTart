@@ -1,6 +1,6 @@
 # Installation
 
-If you just intend to use the shader, **do not** download it from here. This repository only serves as a place to store the source code in case anyone would like to study it in some way. Instead go to [my patreon](https://www.patreon.com/balintshaders) (versions are available early to patreons and become public after a month). Installation instructions can be found [here](https://www.patreon.com/posts/vpt-2-early-test-69912873)
+If you just intend to use the shader, **do not** download it from here. This repository only serves as a place to store the source code in case anyone would like to study it in some way. Instead go to [my patreon](https://www.patreon.com/balintshaders) (versions are available early to patreons and become public after a month). Installation instructions can be found [here](https://blog.balintcsala.com/posts/vpt-setup/)
 
 # About the shader
 
