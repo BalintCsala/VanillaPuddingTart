@@ -16,7 +16,8 @@
         { "name": "AlbedoAtlas" },
         { "name": "NormalAtlas" },
         { "name": "SpecularAtlas" },
-        { "name": "SteveSampler" }
+        { "name": "SteveSampler" },
+        { "name": "SunSampler" }
     ],
     "uniforms": [
         { "name": "ProjMat",    "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },

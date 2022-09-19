@@ -2,12 +2,14 @@
 
 const float PROJNEAR = 0.05;
 const float FPRECISION = 4000000.0;
+const float PI = 3.141592654;
 
 in vec4 Position;
 
 uniform vec2 InSize;
 uniform sampler2D DataSampler;
 uniform sampler2D CounterSampler;
+uniform sampler2D SunSampler;
 
 out vec2 texCoord;
 out vec3 sunDir;
@@ -19,6 +21,7 @@ out float near;
 out float far;
 out mat4 projInv;
 flat out uint frame;
+out vec3 sunColor;
 
 uint readCounter() {
     uvec4 raw = uvec4(texelFetch(CounterSampler, ivec2(0), 0) * 255.0);
@@ -84,6 +87,9 @@ void main() {
         decodeFloat(texture(DataSampler, start + inc).xyz),
         decodeFloat(texture(DataSampler, start + 2.0 * inc).xyz)
     ) * mat3(modelViewMat);
+    
+    float time = atan(sunDir.y, sunDir.x) / PI / 2.0 - 1.0 / 24.0;
+    sunColor = texture(SunSampler, vec2(time, 0.0)).rgb;
 
     sunDir = normalize(sunDir);
 

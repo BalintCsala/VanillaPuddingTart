@@ -14,6 +14,8 @@ uniform sampler2D Sampler2;
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 
+uniform float GameTime;
+
 uniform vec3 Light0_Direction;
 uniform vec3 Light1_Direction;
 

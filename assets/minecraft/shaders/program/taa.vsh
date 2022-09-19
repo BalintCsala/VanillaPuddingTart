@@ -17,6 +17,8 @@ out mat4 prevProjMat;
 out mat3 prevModelViewMat;
 out mat4 projInv;
 out vec3 cameraOffset;
+out float near;
+out float far;
 
 
 int decodeInt(vec3 ivec) {
@@ -90,6 +92,9 @@ void main() {
     ) * 16.0;
     
     cameraOffset = mod(chunkOffset - prevChunkOffset + 24.0, 16.0) - 8.0;
+    
+    near = PROJNEAR;
+    far = projMat[3][2] * near / (projMat[3][2] + 2.0 * near);
 
     projInv = inverse(projMat);
 }

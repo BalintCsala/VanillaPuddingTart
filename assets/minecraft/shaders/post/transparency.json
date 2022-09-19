@@ -88,6 +88,13 @@
                     "width": 1,
                     "height": 1,
                     "bilinear": false
+                },
+                {
+                    "name": "SunSampler",
+                    "id": "sun_color",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": true
                 }
             ]
         },

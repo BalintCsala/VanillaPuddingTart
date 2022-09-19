@@ -35,6 +35,7 @@ const vec2[] OFFSETS = vec2[](
 const vec3 MARKER_COLOR = vec3(1, 0, 1);
 
 void main() {
+    
     vec4 pos = vec4(Position + ChunkOffset, 1.0);
     vec4 textureColor = texture(Sampler0, UV0);
     vec3 diff = textureColor.rgb - MARKER_COLOR;
