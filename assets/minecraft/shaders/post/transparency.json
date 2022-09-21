@@ -2,7 +2,10 @@
     "targets": [
         "solid",
         "result",
+        "temporal_result",
+        "normals",
         "denoised",
+        "blended",
         "water",
         "translucent",
         "itemEntity",
@@ -16,7 +19,9 @@
         { "name": "counter", "width": 200, "height": 200 },
         { "name": "counter_swap", "width": 200, "height": 200 },
         "prev_data",
-        "prev_denoised"
+        "prev_temporal_result",
+        "taa_output",
+        "taa_swap"
     ],
     "passes": [
         {
@@ -100,7 +105,65 @@
         },
         {
             "name": "taa",
+            "intarget": "minecraft:main",
+            "outtarget": "taa_swap",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "PrevDiffuseDepthSampler",
+                    "id": "prev_temporal_result:depth"
+                },
+                {
+                    "name": "PrevDataSampler",
+                    "id": "prev_data"
+                },
+                {
+                    "name": "PrevTAASampler",
+                    "id": "taa_output"
+                }
+            ]
+        },
+        {
+            "name": "blit",
+            "intarget": "taa_swap",
+            "outtarget": "taa_output"
+        },
+        {
+            "name": "taa_blend",
             "intarget": "result",
+            "outtarget": "temporal_result",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "PrevDiffuseSampler",
+                    "id": "prev_temporal_result"
+                },
+                {
+                    "name": "TAASampler",
+                    "id": "taa_output"
+                }
+            ]  
+        },
+        {
+            "name": "normals",
+            "intarget": "minecraft:main",
+            "outtarget": "normals",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "solid:depth"
+                }
+            ]
+        },
+        {
+            "name": "denoiser",
+            "intarget": "temporal_result",
             "outtarget": "denoised",
             "auxtargets": [
                 {
@@ -108,20 +171,23 @@
                     "id": "solid:depth"
                 },
                 {
-                    "name": "PrevResultSampler",
-                    "id": "prev_denoised"
+                    "name": "TAASampler",
+                    "id": "taa_output"
                 },
                 {
-                    "name": "PrevResultDepthSampler",
-                    "id": "prev_denoised:depth"
-                },
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                }
+            ]
+        },
+        {
+            "name": "blend_gi",
+            "intarget": "solid",
+            "outtarget": "blended",
+            "auxtargets": [
                 {
-                    "name": "DataSampler",
-                    "id": "minecraft:main"
-                },
-                {
-                    "name": "PrevDataSampler",
-                    "id": "prev_data"
+                    "name": "GISampler",
+                    "id": "denoised"
                 }
             ]
         },
@@ -160,7 +226,7 @@
         },
         {
             "name": "transparency",
-            "intarget": "denoised",
+            "intarget": "blended",
             "outtarget": "final",
             "auxtargets": [
                 {
@@ -211,8 +277,8 @@
         },
         {
             "name": "copy_with_depth",
-            "intarget": "denoised",
-            "outtarget": "prev_denoised",
+            "intarget": "temporal_result",
+            "outtarget": "prev_temporal_result",
             "auxtargets": [
                 {
                     "name": "DepthSampler",

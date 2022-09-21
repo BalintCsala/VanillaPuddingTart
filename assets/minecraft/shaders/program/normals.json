@@ -4,15 +4,12 @@
         "srcrgb": "one",
         "dstrgb": "zero"
     },
-    "vertex": "taa",
-    "fragment": "taa",
+    "vertex": "normals",
+    "fragment": "normals",
     "attributes": [ "Position" ],
     "samplers": [
         { "name": "DiffuseSampler" },
-        { "name": "DiffuseDepthSampler" },
-        { "name": "PrevDiffuseDepthSampler" },
-        { "name": "PrevDataSampler" },
-        { "name": "PrevTAASampler" }
+        { "name": "DiffuseDepthSampler" }
     ],
     "uniforms": [
         { "name": "ProjMat",    "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },

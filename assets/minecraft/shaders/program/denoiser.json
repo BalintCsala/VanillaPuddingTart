@@ -4,15 +4,14 @@
         "srcrgb": "one",
         "dstrgb": "zero"
     },
-    "vertex": "taa",
-    "fragment": "taa",
+    "vertex": "screenquad",
+    "fragment": "denoiser",
     "attributes": [ "Position" ],
     "samplers": [
         { "name": "DiffuseSampler" },
         { "name": "DiffuseDepthSampler" },
-        { "name": "PrevDiffuseDepthSampler" },
-        { "name": "PrevDataSampler" },
-        { "name": "PrevTAASampler" }
+        { "name": "TAASampler" },
+        { "name": "NormalsSampler" }
     ],
     "uniforms": [
         { "name": "ProjMat",    "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },

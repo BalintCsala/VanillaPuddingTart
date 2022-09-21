@@ -34,7 +34,7 @@ const float EPSILON = 0.001;
 const float PI = 3.141592654;
 const float SUN_SIZE_FACTOR = 0.97;
 const float SUN_INTENSITY = 15.0;
-const float EMISSION_STRENGTH = 70.0;
+const float EMISSION_STRENGTH = 20.0;
 
 const vec3 SKY_COLOR = vec3(49, 100, 255) / 255.0;
 const float GAMMA_CORRECTION = 2.2;
@@ -183,14 +183,14 @@ struct Material {
 };
 
 const vec3 PREDETERMINED_F0[] = vec3[](
-    pow(vec3(0.53123, 0.51236, 0.49583), vec3(GAMMA_CORRECTION)), // Iron
-    pow(vec3(0.94423, 0.77610, 0.37340), vec3(GAMMA_CORRECTION)), // Gold
-    pow(vec3(0.91230, 0.91385, 0.91968), vec3(GAMMA_CORRECTION)), // Aluminium
-    pow(vec3(0.55560, 0.55454, 0.55478), vec3(GAMMA_CORRECTION)), // Chrome
-    pow(vec3(0.92595, 0.72090, 0.50415), vec3(GAMMA_CORRECTION)), // Copper
-    pow(vec3(0.63248, 0.62594, 0.64148), vec3(GAMMA_CORRECTION)), // Lead
-    pow(vec3(0.67885, 0.64240, 0.58841), vec3(GAMMA_CORRECTION)), // Platinum
-    pow(vec3(0.96200, 0.94947, 0.92212), vec3(GAMMA_CORRECTION))  // Silver
+    vec3(0.53123, 0.51236, 0.49583), // Iron
+    vec3(0.94423, 0.77610, 0.37340), // Gold
+    vec3(0.91230, 0.91385, 0.91968), // Aluminium
+    vec3(0.55560, 0.55454, 0.55478), // Chrome
+    vec3(0.92595, 0.72090, 0.50415), // Copper
+    vec3(0.63248, 0.62594, 0.64148), // Lead
+    vec3(0.67885, 0.64240, 0.58841), // Platinum
+    vec3(0.96200, 0.94947, 0.92212)  // Silver
 );
 
 float luma(vec3 rgb) {
@@ -240,6 +240,7 @@ Material getMaterial(ivec3 blockPos, vec2 texCoord, vec3 geometryNormal) {
     vec3 normalData = texelFetch(NormalAtlas, atlasTexCoord, 0).rgb;
     if (dot(normalData.xy, normalData.xy) < 0.01) {
         normalData.xy = vec2(0.5);
+        normalData.z = 1.0;
     }
     
     vec3 specularData = texelFetch(SpecularAtlas, atlasTexCoord, 0).rgb;
@@ -442,16 +443,6 @@ vec4 encodeHDRColor(vec3 color) {
     ) / 255.0;
 }
 
-vec3 decodeHDRColor(vec4 raw) {
-    uvec4 scaled = uvec4(raw * 255.0) << uvec4(0, 8, 16, 24);
-    uint data = scaled.x | scaled.y | scaled.z | scaled.w;
-    return vec3(
-        float(data & 2047u),
-        float((data >> 11u) & 2047u),
-        float(data >> 22u)
-    ) / 128.0;
-}
-
 void main() {
     ivec2 fragCoord = ivec2(gl_FragCoord.xy);
     initRNG(uvec2(fragCoord), uvec2(InSize), frame);
@@ -467,7 +458,7 @@ void main() {
     vec3 viewPos = screenToView(screenPos, projInv);
     vec3 playerPos = viewPos * mat3(modelViewMat);
     vec3 normal = normalize(cross(dFdx(playerPos), dFdy(playerPos)));//getNormal(texCoord, depth, viewPos);
-    vec3 radiance = pathtrace(playerPos, normal) * albedo;
+    vec3 radiance = pathtrace(playerPos, normal);
     
     vec3 outputColor = pow(radiance, vec3(1.0 / GAMMA_CORRECTION));
     fragColor = encodeHDRColor(outputColor);
