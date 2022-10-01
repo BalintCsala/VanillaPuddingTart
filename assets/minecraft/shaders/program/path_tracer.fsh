@@ -34,7 +34,7 @@ const float EPSILON = 0.001;
 const float PI = 3.141592654;
 const float SUN_SIZE_FACTOR = 0.97;
 const float SUN_INTENSITY = 15.0;
-const float EMISSION_STRENGTH = 20.0;
+const float EMISSION_STRENGTH = 40.0;
 
 const vec3 SKY_COLOR = vec3(49, 100, 255) / 255.0;
 const float GAMMA_CORRECTION = 2.2;

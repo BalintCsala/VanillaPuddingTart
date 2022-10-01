@@ -13,6 +13,8 @@ in float far;
 uniform sampler2D DiffuseDepthSampler;
 uniform sampler2D PrevDiffuseDepthSampler;
 uniform sampler2D PrevTAASampler;
+uniform sampler2D NormalsSampler;
+uniform sampler2D PrevNormalsSampler;
 
 uniform vec2 InSize;
 
@@ -39,6 +41,13 @@ void main() {
     vec4 prevClipPos = prevProjMat * vec4(prevModelViewMat * prevPlayerPos, 1.0);
     vec3 prevScreenPos = prevClipPos.xyz / prevClipPos.w * 0.5 + 0.5;
     
+    vec3 normals = texture(NormalsSampler, texCoord).rgb * 2.0 - 1.0;
+    vec3 prevNormals = texture(PrevNormalsSampler, prevScreenPos.xy).rgb * 2.0 - 1.0;
+    if (dot(normals, prevNormals) < 0.7) {
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0 / 255.0);
+        return;
+    }
+    
     vec2 offset = (prevScreenPos.xy - texCoord) * InSize;
     if (clamp(prevScreenPos.xy, 0.0, 1.0) != prevScreenPos.xy || max(abs(offset.x), abs(offset.y)) > 127.5) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0 / 255.0);
@@ -46,12 +55,12 @@ void main() {
     }
     
     float prevDepth = texture(PrevDiffuseDepthSampler, prevScreenPos.xy).r;
-    if (abs(linearizeDepth(depth) - linearizeDepth(prevDepth)) > 0.5) {
+    if (abs(depth - prevDepth) > 0.004) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0 / 255.0);
         return;
     }
     
-    uint counter = uint(texture(PrevTAASampler, texCoord).a * 255.0);
+    uint counter = uint(texture(PrevTAASampler, prevScreenPos.xy).a * 255.0);
     counter = min(counter + 1u, 255u);
     
     uvec2 offsetDataRaw = uvec2(round((offset + 128.0) * 16.0)) << uvec2(12u, 0u);
@@ -60,6 +69,6 @@ void main() {
         offsetData >> 16u,
         (offsetData >> 8u) & 255u,
         offsetData & 255u,
-        255.0
+        counter
     ) / 255.0;
 }

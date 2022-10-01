@@ -1,0 +1,15 @@
+{
+    "blend": {
+      "func": "add",
+      "srcrgb": "one",
+      "dstrgb": "zero"
+    },
+    "vertex": "blit2",
+    "fragment": "blit2",
+    "attributes": [ "Position" ],
+    "samplers": [
+      { "name": "DiffuseSampler" }
+    ],
+    "uniforms": [
+    ]
+  }

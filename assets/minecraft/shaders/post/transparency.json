@@ -20,8 +20,11 @@
         { "name": "counter_swap", "width": 200, "height": 200 },
         "prev_data",
         "prev_temporal_result",
+        "prev_normals",
         "taa_output",
-        "taa_swap"
+        "taa_swap",
+        "mipmaps",
+        "swap"
     ],
     "passes": [
         {
@@ -104,6 +107,17 @@
             ]
         },
         {
+            "name": "normals",
+            "intarget": "minecraft:main",
+            "outtarget": "normals",
+            "auxtargets": [
+                {
+                    "name": "DiffuseDepthSampler",
+                    "id": "solid:depth"
+                }
+            ]
+        },
+        {
             "name": "taa",
             "intarget": "minecraft:main",
             "outtarget": "taa_swap",
@@ -123,11 +137,19 @@
                 {
                     "name": "PrevTAASampler",
                     "id": "taa_output"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "PrevNormalsSampler",
+                    "id": "prev_normals"
                 }
             ]
         },
         {
-            "name": "blit",
+            "name": "blit2",
             "intarget": "taa_swap",
             "outtarget": "taa_output"
         },
@@ -151,13 +173,46 @@
             ]  
         },
         {
-            "name": "normals",
-            "intarget": "minecraft:main",
-            "outtarget": "normals",
-            "auxtargets": [
+            "name": "mipmap",
+            "intarget": "temporal_result",
+            "outtarget": "swap",
+            "uniforms": [
                 {
-                    "name": "DiffuseDepthSampler",
-                    "id": "solid:depth"
+                    "name": "Stage",
+                    "values": [ 1.0 ]
+                }
+            ]
+        },
+        {
+            "name": "mipmap",
+            "intarget": "swap",
+            "outtarget": "mipmaps",
+            "uniforms": [
+                {
+                    "name": "Stage",
+                    "values": [ 2.0 ]
+                }
+            ]
+        },
+        {
+            "name": "mipmap",
+            "intarget": "mipmaps",
+            "outtarget": "swap",
+            "uniforms": [
+                {
+                    "name": "Stage",
+                    "values": [ 3.0 ]
+                }
+            ]
+        },
+        {
+            "name": "mipmap",
+            "intarget": "swap",
+            "outtarget": "mipmaps",
+            "uniforms": [
+                {
+                    "name": "Stage",
+                    "values": [ 4.0 ]
                 }
             ]
         },
@@ -177,6 +232,44 @@
                 {
                     "name": "NormalsSampler",
                     "id": "normals"
+                },
+                {
+                    "name": "MipmapSampler",
+                    "id": "mipmaps"
+                }
+            ]
+        },
+        {
+            "name": "blur2",
+            "intarget": "denoised",
+            "outtarget": "swap",
+            "auxtargets": [
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Direction",
+                    "values": [ 1.0, 0.0 ]
+                }
+            ]
+        },
+        {
+            "name": "blur2",
+            "intarget": "swap",
+            "outtarget": "denoised",
+            "auxtargets": [
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Direction",
+                    "values": [ 0.0, 1.0 ]
                 }
             ]
         },
@@ -296,6 +389,11 @@
                     "id": "minecraft:main:depth"
                 }
             ]
+        },
+        {
+            "name": "blit2",
+            "intarget": "normals",
+            "outtarget": "prev_normals"
         },
         {
             "name": "blit",

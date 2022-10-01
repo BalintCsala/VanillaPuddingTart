@@ -52,30 +52,31 @@ vec3 bilinearSample(sampler2D sampl, vec2 fragCoord) {
 
 void main() {
     ivec2 fragCoord = ivec2(texCoord * InSize);
-    uvec4 dataRaw = uvec4(texelFetch(TAASampler, fragCoord, 0) * 255.0) << uvec4(24u, 16u, 8u, 0u);
-    uint data = dataRaw.x | dataRaw.y | dataRaw.z | dataRaw.w;
+    vec4 data = texelFetch(TAASampler, fragCoord, 0);
+    uvec3 offsetDataRaw = uvec3(data.rgb * 255.0) << uvec3(16u, 8u, 0u);
+    uint offsetData = offsetDataRaw.x | offsetDataRaw.y | offsetDataRaw.z;
     
+    vec2 offset = vec2(
+        offsetData >> 12u,
+        offsetData & 4095u
+    ) / 16.0 - 128.0; 
+
     gl_FragDepth = texelFetch(DiffuseDepthSampler, fragCoord, 0).r;
     vec4 colorData = texelFetch(DiffuseSampler, fragCoord, 0);
     
-    uint counter = data & 255u - 1u;
+    uint counter = uint(data.a * 255.0) - 1u;
     if (counter == 0u) {
         fragColor = colorData;
         return;
     }
     
     vec3 color = decodeHDRColor(colorData);
-    vec2 offset = vec2(
-        data >> 20u,
-        (data >> 8u) & 4095u
-    ) / 16.0 - 128.0; 
-    
     
     vec3 prevColor = bilinearSample(PrevDiffuseSampler, vec2(fragCoord) + offset + 1.0 / 64.0);
     
     fragColor = encodeHDRColor(mix(
         color,
         prevColor,
-        min(float(counter) / float(counter + 1u), 0.95)
+        min(float(counter) / float(counter + 1u), 0.96)
     ));
 } 

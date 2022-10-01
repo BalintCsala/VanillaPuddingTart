@@ -5,24 +5,13 @@
         "dstrgb": "zero"
     },
     "vertex": "screenquad",
-    "fragment": "denoiser",
+    "fragment": "blur2",
     "attributes": ["Position"],
     "samplers": [{
-            "name": "DiffuseSampler"
-        },
-        {
-            "name": "DiffuseDepthSampler"
-        },
-        {
-            "name": "TAASampler"
-        },
-        {
-            "name": "NormalsSampler"
-        },
-        {
-            "name": "MipmapSampler"
-        }
-    ],
+        "name": "DiffuseSampler"
+    }, {
+        "name": "NormalsSampler"
+    }],
     "uniforms": [{
             "name": "ProjMat",
             "type": "matrix4x4",
@@ -34,6 +23,18 @@
             "type": "float",
             "count": 2,
             "values": [1.0, 1.0]
+        },
+        {
+            "name": "OutSize",
+            "type": "float",
+            "count": 2,
+            "values": [1.0, 1.0]
+        },
+        {
+            "name": "Direction",
+            "type": "float",
+            "count": 2,
+            "values": [1.0, 0.0]
         }
     ]
 }
