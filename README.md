@@ -1,5 +1,3 @@
-# Voxelization template for vanilla minecraft shaders
+# VanillaPuddingTart - Vanilla Path Tracing shaders
 
-Based on the [sun-position](https://github.com/bradleyq/shader-toolkit) template from 
-
-For further info ask Bálint#1673 on discord
+This place only stores the source code for future reference, **do not** download it from here if you just want to use it, instead go to my [patreon](patreon.com/balintshaders)
