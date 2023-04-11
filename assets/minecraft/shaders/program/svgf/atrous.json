@@ -1,0 +1,59 @@
+{
+    "blend": {
+        "func": "add",
+        "srcrgb": "one",
+        "dstrgb": "zero"
+    },
+    "vertex": "svgf/atrous",
+    "fragment": "svgf/atrous",
+    "attributes": [
+        "Position"
+    ],
+    "samplers": [
+        {
+            "name": "DiffuseSampler"
+        },
+        {
+            "name": "DataSampler"
+        },
+        {
+            "name": "DepthSampler"
+        },
+        {
+            "name": "NormalsSampler"
+        },
+        {
+            "name": "VarianceSampler"
+        },
+        {
+            "name": "MaterialMask"
+        }
+    ],
+    "uniforms": [
+        {
+            "name": "InSize",
+            "type": "float",
+            "count": 2,
+            "values": [
+                1.0,
+                1.0
+            ]
+        },
+        {
+            "name": "Step",
+            "type": "float",
+            "count": 1,
+            "values": [
+                0.0
+            ]
+        },
+        {
+            "name": "Direction",
+            "type": "float",
+            "count": 2,
+            "values": [
+                1.0, 0.0
+            ]
+        }
+    ]
+}

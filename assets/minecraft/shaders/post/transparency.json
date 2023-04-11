@@ -4,7 +4,6 @@
         "result",
         "temporal_result",
         "normals",
-        "denoised",
         "blended",
         "water",
         "translucent",
@@ -16,15 +15,31 @@
         "particles_decheckered",
         "itemEntity_decheckered",
         "final",
-        { "name": "counter", "width": 200, "height": 200 },
-        { "name": "counter_swap", "width": 200, "height": 200 },
+        {
+            "name": "counter",
+            "width": 200,
+            "height": 200
+        },
+        {
+            "name": "counter_swap",
+            "width": 200,
+            "height": 200
+        },
         "prev_data",
         "prev_temporal_result",
         "prev_normals",
-        "taa_output",
-        "taa_swap",
-        "mipmaps",
-        "swap"
+        "prev_solid",
+        "swap",
+        "global_illumination",
+        "blurred",
+        "variance",
+        "moments",
+        "prev_moments",
+        {
+            "name": "voxels",
+            "width": 839,
+            "height": 839
+        }
     ],
     "passes": [
         {
@@ -35,7 +50,18 @@
         {
             "name": "blit",
             "intarget": "counter_swap",
-            "outtarget": "counter"  
+            "outtarget": "counter"
+        },
+        {
+            "name": "sdf/collect_voxels",
+            "intarget": "minecraft:main",
+            "outtarget": "voxels",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "minecraft:main:depth"
+                }
+            ]
         },
         {
             "name": "de_checkerboard",
@@ -43,18 +69,70 @@
             "outtarget": "solid",
             "auxtargets": [
                 {
-                    "name": "DiffuseDepthSampler",
+                    "name": "DepthSampler",
                     "id": "minecraft:main:depth"
+                }
+            ]
+        },
+        {
+            "name": "de_checkerboard",
+            "intarget": "translucent",
+            "outtarget": "translucent_decheckered",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "translucent:depth"
+                }
+            ]
+        },
+        {
+            "name": "water",
+            "intarget": "translucent_decheckered",
+            "outtarget": "water",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "translucent_decheckered:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                },
+                {
+                    "name": "VoronoiSampler",
+                    "id": "voronoi",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": true
+                },
+                {
+                    "name": "CounterSampler",
+                    "id": "counter"
+                }
+            ]
+        },
+        {
+            "name": "normals",
+            "intarget": "solid",
+            "outtarget": "normals",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
                 }
             ]
         },
         {
             "name": "path_tracer",
             "intarget": "solid",
-            "outtarget": "result",
+            "outtarget": "global_illumination",
             "auxtargets": [
                 {
-                    "name": "DiffuseDepthSampler",
+                    "name": "DepthSampler",
                     "id": "solid:depth"
                 },
                 {
@@ -62,30 +140,19 @@
                     "id": "minecraft:main"
                 },
                 {
-                    "name": "DataDepthSampler",
-                    "id": "minecraft:main:depth"
-                },
-                {
                     "name": "CounterSampler",
                     "id": "counter"
                 },
                 {
-                    "name": "AlbedoAtlas",
-                    "id": "atlas",
+                    "name": "Atlas",
+                    "id": "atlas_combined",
                     "width": 1,
                     "height": 1,
                     "bilinear": false
                 },
                 {
-                    "name": "NormalAtlas",
-                    "id": "atlas_normal",
-                    "width": 1,
-                    "height": 1,
-                    "bilinear": false
-                },
-                {
-                    "name": "SpecularAtlas",
-                    "id": "atlas_specular",
+                    "name": "Models",
+                    "id": "model_data",
                     "width": 1,
                     "height": 1,
                     "bilinear": false
@@ -103,40 +170,49 @@
                     "width": 1,
                     "height": 1,
                     "bilinear": true
+                },
+                {
+                    "name": "WaterSampler",
+                    "id": "water"
+                },
+                {
+                    "name": "VoxelSampler",
+                    "id": "voxels"
+                },
+                {
+                    "name": "VoxelDepthSampler",
+                    "id": "voxels:depth"
+                },
+                {
+                    "name": "NormalSampler",
+                    "id": "normals"
                 }
             ]
         },
         {
-            "name": "normals",
-            "intarget": "minecraft:main",
-            "outtarget": "normals",
+            "name": "svgf/temporal",
+            "intarget": "global_illumination",
+            "outtarget": "temporal_result",
             "auxtargets": [
                 {
-                    "name": "DiffuseDepthSampler",
-                    "id": "solid:depth"
-                }
-            ]
-        },
-        {
-            "name": "taa",
-            "intarget": "minecraft:main",
-            "outtarget": "taa_swap",
-            "auxtargets": [
-                {
-                    "name": "DiffuseDepthSampler",
+                    "name": "DepthSampler",
                     "id": "solid:depth"
                 },
                 {
-                    "name": "PrevDiffuseDepthSampler",
-                    "id": "prev_temporal_result:depth"
+                    "name": "PrevDiffuseSampler",
+                    "id": "prev_temporal_result"
+                },
+                {
+                    "name": "PrevDepthSampler",
+                    "id": "prev_solid:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
                 },
                 {
                     "name": "PrevDataSampler",
                     "id": "prev_data"
-                },
-                {
-                    "name": "PrevTAASampler",
-                    "id": "taa_output"
                 },
                 {
                     "name": "NormalsSampler",
@@ -145,131 +221,511 @@
                 {
                     "name": "PrevNormalsSampler",
                     "id": "prev_normals"
+                },
+                {
+                    "name": "PrevCounterSampler",
+                    "id": "prev_temporal_result:depth"
+                }
+            ]
+        },
+        {
+            "name": "svgf/moments",
+            "intarget": "global_illumination",
+            "outtarget": "moments",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "CounterSampler",
+                    "id": "temporal_result:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                },
+                {
+                    "name": "PrevDataSampler",
+                    "id": "prev_data"
+                },
+                {
+                    "name": "PrevMomentsSampler",
+                    "id": "prev_moments"
                 }
             ]
         },
         {
             "name": "blit2",
-            "intarget": "taa_swap",
-            "outtarget": "taa_output"
+            "intarget": "moments",
+            "outtarget": "prev_moments"
         },
         {
-            "name": "taa_blend",
-            "intarget": "result",
-            "outtarget": "temporal_result",
+            "name": "svgf/variance",
+            "intarget": "moments",
+            "outtarget": "variance",
             "auxtargets": [
                 {
-                    "name": "DiffuseDepthSampler",
+                    "name": "DepthSampler",
                     "id": "solid:depth"
                 },
                 {
-                    "name": "PrevDiffuseSampler",
-                    "id": "prev_temporal_result"
+                    "name": "CounterSampler",
+                    "id": "temporal_result:depth"
                 },
                 {
-                    "name": "TAASampler",
-                    "id": "taa_output"
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                },
+                {
+                    "name": "PrevDataSampler",
+                    "id": "prev_data"
                 }
-            ]  
+            ]
         },
         {
-            "name": "mipmap",
+            "name": "svgf/atrous",
             "intarget": "temporal_result",
             "outtarget": "swap",
-            "uniforms": [
-                {
-                    "name": "Stage",
-                    "values": [ 1.0 ]
-                }
-            ]
-        },
-        {
-            "name": "mipmap",
-            "intarget": "swap",
-            "outtarget": "mipmaps",
-            "uniforms": [
-                {
-                    "name": "Stage",
-                    "values": [ 2.0 ]
-                }
-            ]
-        },
-        {
-            "name": "mipmap",
-            "intarget": "mipmaps",
-            "outtarget": "swap",
-            "uniforms": [
-                {
-                    "name": "Stage",
-                    "values": [ 3.0 ]
-                }
-            ]
-        },
-        {
-            "name": "mipmap",
-            "intarget": "swap",
-            "outtarget": "mipmaps",
-            "uniforms": [
-                {
-                    "name": "Stage",
-                    "values": [ 4.0 ]
-                }
-            ]
-        },
-        {
-            "name": "denoiser",
-            "intarget": "temporal_result",
-            "outtarget": "denoised",
             "auxtargets": [
                 {
-                    "name": "DiffuseDepthSampler",
+                    "name": "DepthSampler",
                     "id": "solid:depth"
-                },
-                {
-                    "name": "TAASampler",
-                    "id": "taa_output"
                 },
                 {
                     "name": "NormalsSampler",
                     "id": "normals"
                 },
                 {
-                    "name": "MipmapSampler",
-                    "id": "mipmaps"
-                }
-            ]
-        },
-        {
-            "name": "blur2",
-            "intarget": "denoised",
-            "outtarget": "swap",
-            "auxtargets": [
+                    "name": "VarianceSampler",
+                    "id": "variance:depth"
+                },
                 {
-                    "name": "NormalsSampler",
-                    "id": "normals"
+                    "name": "MaterialMask",
+                    "id": "result:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
                 }
             ],
             "uniforms": [
                 {
+                    "name": "Step",
+                    "values": [
+                        1.0
+                    ]
+                },
+                {
                     "name": "Direction",
-                    "values": [ 1.0, 0.0 ]
+                    "values": [
+                        1.0,
+                        0.0
+                    ]
                 }
             ]
         },
         {
-            "name": "blur2",
+            "name": "svgf/atrous",
             "intarget": "swap",
-            "outtarget": "denoised",
+            "outtarget": "blurred",
             "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
                 {
                     "name": "NormalsSampler",
                     "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "swap:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "result:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
                 }
             ],
             "uniforms": [
                 {
+                    "name": "Step",
+                    "values": [
+                        1.0
+                    ]
+                },
+                {
                     "name": "Direction",
-                    "values": [ 0.0, 1.0 ]
+                    "values": [
+                        0.0,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "copy_with_depth",
+            "intarget": "temporal_result",
+            "outtarget": "prev_temporal_result",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "temporal_result:depth"
+                }
+            ]
+        },
+        {
+            "name": "svgf/atrous",
+            "intarget": "blurred",
+            "outtarget": "swap",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "blurred:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "global_illumination:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [
+                        2.0
+                    ]
+                },
+                {
+                    "name": "Direction",
+                    "values": [
+                        1.0,
+                        0.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "svgf/atrous",
+            "intarget": "swap",
+            "outtarget": "blurred",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "swap:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "global_illumination:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [
+                        2.0
+                    ]
+                },
+                {
+                    "name": "Direction",
+                    "values": [
+                        0.0,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "svgf/atrous",
+            "intarget": "blurred",
+            "outtarget": "swap",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "blurred:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "global_illumination:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [
+                        4.0
+                    ]
+                },
+                {
+                    "name": "Direction",
+                    "values": [
+                        1.0,
+                        0.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "svgf/atrous",
+            "intarget": "swap",
+            "outtarget": "blurred",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "swap:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "global_illumination:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [
+                        4.0
+                    ]
+                },
+                {
+                    "name": "Direction",
+                    "values": [
+                        0.0,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "svgf/atrous",
+            "intarget": "blurred",
+            "outtarget": "swap",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "blurred:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "global_illumination:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [
+                        8.0
+                    ]
+                },
+                {
+                    "name": "Direction",
+                    "values": [
+                        1.0,
+                        0.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "svgf/atrous",
+            "intarget": "swap",
+            "outtarget": "blurred",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "swap:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "global_illumination:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [
+                        8.0
+                    ]
+                },
+                {
+                    "name": "Direction",
+                    "values": [
+                        0.0,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "svgf/atrous",
+            "intarget": "blurred",
+            "outtarget": "swap",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "blurred:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "global_illumination:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [
+                        16.0
+                    ]
+                },
+                {
+                    "name": "Direction",
+                    "values": [
+                        1.0,
+                        0.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "svgf/atrous",
+            "intarget": "swap",
+            "outtarget": "blurred",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
+                },
+                {
+                    "name": "NormalsSampler",
+                    "id": "normals"
+                },
+                {
+                    "name": "VarianceSampler",
+                    "id": "swap:depth"
+                },
+                {
+                    "name": "MaterialMask",
+                    "id": "global_illumination:depth"
+                },
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                }
+            ],
+            "uniforms": [
+                {
+                    "name": "Step",
+                    "values": [
+                        16.0
+                    ]
+                },
+                {
+                    "name": "Direction",
+                    "values": [
+                        0.0,
+                        1.0
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "upscale",
+            "intarget": "blurred",
+            "outtarget": "result",
+            "auxtargets": [
+                {
+                    "name": "DataSampler",
+                    "id": "minecraft:main"
+                },
+                {
+                    "name": "DepthSampler",
+                    "id": "global_illumination:depth"
                 }
             ]
         },
@@ -280,18 +736,15 @@
             "auxtargets": [
                 {
                     "name": "GISampler",
-                    "id": "denoised"
-                }
-            ]
-        },
-        {
-            "name": "de_checkerboard",
-            "intarget": "translucent",
-            "outtarget": "translucent_decheckered",
-            "auxtargets": [
+                    "id": "result"
+                },
                 {
-                    "name": "DiffuseDepthSampler",
-                    "id": "translucent:depth"
+                    "name": "MaterialMask",
+                    "id": "result:depth"
+                },
+                {
+                    "name": "WaterSampler",
+                    "id": "water"
                 }
             ]
         },
@@ -301,7 +754,7 @@
             "outtarget": "particles_decheckered",
             "auxtargets": [
                 {
-                    "name": "DiffuseDepthSampler",
+                    "name": "DepthSampler",
                     "id": "particles:depth"
                 }
             ]
@@ -312,7 +765,7 @@
             "outtarget": "itemEntity_decheckered",
             "auxtargets": [
                 {
-                    "name": "DiffuseDepthSampler",
+                    "name": "DepthSampler",
                     "id": "itemEntity:depth"
                 }
             ]
@@ -323,16 +776,8 @@
             "outtarget": "final",
             "auxtargets": [
                 {
-                    "name": "DiffuseDepthSampler",
+                    "name": "DepthSampler",
                     "id": "solid:depth"
-                },
-                {
-                    "name": "TranslucentSampler",
-                    "id": "translucent_decheckered"
-                },
-                {
-                    "name": "TranslucentDepthSampler",
-                    "id": "translucent_decheckered:depth"
                 },
                 {
                     "name": "ItemEntitySampler",
@@ -365,17 +810,13 @@
                 {
                     "name": "WeatherDepthSampler",
                     "id": "weather:depth"
-                }
-            ]
-        },
-        {
-            "name": "copy_with_depth",
-            "intarget": "temporal_result",
-            "outtarget": "prev_temporal_result",
-            "auxtargets": [
+                },
                 {
-                    "name": "DepthSampler",
-                    "id": "solid:depth"
+                    "name": "Atlas",
+                    "id": "atlas_combined",
+                    "width": 1,
+                    "height": 1,
+                    "bilinear": false
                 }
             ]
         },
@@ -387,6 +828,17 @@
                 {
                     "name": "DepthSampler",
                     "id": "minecraft:main:depth"
+                }
+            ]
+        },
+        {
+            "name": "copy_with_depth",
+            "intarget": "solid",
+            "outtarget": "prev_solid",
+            "auxtargets": [
+                {
+                    "name": "DepthSampler",
+                    "id": "solid:depth"
                 }
             ]
         },

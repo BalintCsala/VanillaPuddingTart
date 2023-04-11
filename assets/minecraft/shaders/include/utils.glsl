@@ -1,5 +1,3 @@
-#version 150
-
 #define NUMCONTROLS 26
 #define THRESH 0.5
 #define FPRECISION 4000000.0

@@ -1,0 +1,24 @@
+{
+    "blend": {
+        "func": "add",
+        "srcrgb": "one",
+        "dstrgb": "zero"
+    },
+    "vertex": "svgf/temporal",
+    "fragment": "svgf/temporal",
+    "attributes": [ "Position" ],
+    "samplers": [
+        { "name": "DiffuseSampler" },
+        { "name": "DepthSampler" },
+        { "name": "PrevDiffuseSampler" },
+        { "name": "PrevDepthSampler" },
+        { "name": "DataSampler" },
+        { "name": "PrevDataSampler" },
+        { "name": "NormalsSampler" },
+        { "name": "PrevNormalsSampler" },
+        { "name": "PrevCounterSampler" }
+    ],
+    "uniforms": [
+        { "name": "InSize",    "type": "float",     "count": 2,  "values": [ 1.0, 1.0 ] }
+    ]
+}

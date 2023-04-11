@@ -1,9 +1,18 @@
-#version 150
+#version 420
+
+#include<hdr.glsl>
+#include<constants.glsl>
+#include<rand.glsl>
+#include<voxelization.glsl>
+#include<conversions.glsl>
+#include<materialMask.glsl>
+#include<quaternions.glsl>
+#line 10 0
 
 in vec2 texCoord;
 in vec3 sunDir;
 in mat4 projMat;
-in mat4 modelViewMat;
+in mat3 modelViewMat;
 in vec3 chunkOffset;
 in vec3 rayDir;
 in float near;
@@ -11,103 +20,43 @@ in float far;
 in mat4 projInv;
 flat in uint frame;
 in vec3 sunColor;
+in float renderScale;
+in vec3 steveDirection;
+flat in ivec2 atlasSize;
 
 uniform sampler2D DiffuseSampler;
-uniform sampler2D DiffuseDepthSampler;
-uniform sampler2D DataSampler;
-uniform sampler2D DataDepthSampler;
+uniform sampler2D DepthSampler;
+uniform sampler2D WaterSampler;
+uniform sampler2D NormalSampler;
 
-uniform sampler2D AlbedoAtlas;
-uniform sampler2D NormalAtlas;
-uniform sampler2D SpecularAtlas;
+uniform sampler2D VoxelSampler;
+uniform sampler2D VoxelDepthSampler;
 
+uniform sampler2D Atlas;
+uniform sampler2D Models;
 uniform sampler2D SteveSampler;
 
 uniform vec2 InSize;
 
 out vec4 fragColor;
 
-const ivec2 GRID_SIZE = ivec2(1024, 705);
-const int AREA_SIDE_LENGTH = int(pow(float(GRID_SIZE.x * GRID_SIZE.y / 2), 1.0 / 3.0));
-
-const float EPSILON = 0.001;
-const float PI = 3.141592654;
 const float SUN_SIZE_FACTOR = 0.97;
-const float SUN_INTENSITY = 15.0;
-const float EMISSION_STRENGTH = 40.0;
+const float SUN_INTENSITY = 5.0;
+const float EMISSION_STRENGTH = 30.0;
+const float WATER_F0 = (1.333 - 1.0) * (1.333 - 1.0) / (1.333 + 1.0) / (1.333 + 1.0);
 
-const vec3 SKY_COLOR = vec3(49, 100, 255) / 255.0;
+const vec3 SKY_COLOR = vec3(30, 60, 255) / 255.0 * 0.8;
 const float GAMMA_CORRECTION = 2.2;
 
-// RANDOM
+const float ANGLE_22_5 = 0.39269908169872414;
 
-uint state;
-
-uint rand() {
-	state = (state << 13U) ^ state;
-    state = state * (state * state * 15731U + 789221U) + 1376312589U;
-    return state;
-}
-
-float randFloat() {
-    return float(rand() & uvec3(0x7fffffffU)) / float(0x7fffffff);
-}
-
-vec2 randVec2() {
-    return vec2(randFloat(), randFloat());
-}
-
-vec3 randVec3() {
-    return vec3(randFloat(), randFloat(), randFloat());
-}
-
-vec4 randVec4() {
-    return vec4(randFloat(), randFloat(), randFloat(), randFloat());
-}
-
-void initRNG(uvec2 pixel, uvec2 resolution, uint frame) {
-    state = frame;
-    state = (pixel.x + pixel.y * resolution.x) ^ rand();
-    rand();
-}
-
-// VOXELIZATION
-
-ivec2 positionToCell(vec3 position, out bool inside) {
-    ivec3 sides = ivec3(AREA_SIDE_LENGTH);
-
-    ivec3 iPosition = ivec3(floor(position));
-    iPosition += sides / 2;
-
-    inside = true;
-    if (clamp(iPosition, ivec3(0), sides - 1) != iPosition) {
-        inside = false;
-        return ivec2(-1);
-    }
-
-    int index = (iPosition.y * sides.z + iPosition.z) * sides.x + iPosition.x;
-    
-    int halfWidth = GRID_SIZE.x / 2;
-    ivec2 result = ivec2(
-        (index % halfWidth) * 2,
-        index / halfWidth + 1
-    );
-    result.x += result.y % 2;
-
-    return result;
-}
-
-ivec2 cellToPixel(ivec2 cell) {
-    return ivec2(round(vec2(cell) / GRID_SIZE * InSize));
-}
+struct Ray {
+    vec3 origin;
+    ivec3 cell;
+    vec3 direction;
+};
 
 // UTILS
-
-vec3 screenToView(vec3 screenPos, mat4 projInv) {
-    vec4 ndc = vec4(screenPos * 2.0 - 1.0, 1.0);
-    vec4 viewPos = projInv * ndc;
-    return viewPos.xyz / viewPos.w;
-}
 
 vec3 cosineWeighted(vec3 normal) {
     vec2 v = randVec2();
@@ -118,58 +67,147 @@ vec3 cosineWeighted(vec3 normal) {
     return normalize(normal + directionOffset);
 }
 
-vec3 viewToScreen(vec3 viewPos) {
-    vec4 clipEnd = projMat * vec4(viewPos, 1);
-    return clipEnd.xyz / clipEnd.w * 0.5 + 0.5;
-}
-
 // MAIN 
 
-vec3 getNormal(vec2 texCoord, float depth, vec3 viewPos) {
-    vec2 off = 1.0 / InSize * 1.01;
-    vec2 right = texCoord + vec2(off.x, 0);
-    vec2 left = texCoord + vec2(-off.x, 0);
-    vec2 top = texCoord + vec2(0, off.y);
-    vec2 bottom = texCoord + vec2(0, -off.y);
-    
-    float depthRight = texture(DiffuseDepthSampler, right).r;
-    float depthLeft = texture(DiffuseDepthSampler, left).r;
-    float depthTop = texture(DiffuseDepthSampler, top).r;
-    float depthBottom = texture(DiffuseDepthSampler, bottom).r;
-    float depthX, depthY;
-    vec2 texCoordX, texCoordY;
-    float mul = 1.0;
-    
-    if (abs(depthRight - depth) < abs(depthLeft - depth)) {
-        depthX = depthRight;
-        texCoordX = right;
-    } else {
-        depthX = depthLeft;
-        texCoordX = left;
-        mul *= -1.0;
-    }
-    if (abs(depthTop - depth) < abs(depthBottom - depth)) {
-        depthY = depthTop;
-        texCoordY = top;
-    } else {
-        depthY = depthBottom;
-        texCoordY = bottom;
-        mul *= -1.0;
-    }
-    
-    vec3 viewPosX = screenToView(vec3(texCoordX, depthX), projInv);
-    vec3 viewPosY = screenToView(vec3(texCoordY, depthY), projInv);
-    vec3 viewNormal = normalize(cross(viewPosX - viewPos, viewPosY - viewPos)) * mul;
-    return viewNormal * mat3(modelViewMat);
+vec2 boxIntersection( in vec3 ro, in vec3 rd, vec3 boxSize, out vec3 outNormal ) 
+{
+    vec3 m = 1.0/rd; // can precompute if traversing a set of aligned boxes
+    vec3 n = m*ro;   // can precompute if traversing a set of aligned boxes
+    vec3 k = abs(m)*boxSize;
+    vec3 t1 = -n - k;
+    vec3 t2 = -n + k;
+    float tN = max( max( t1.x, t1.y ), t1.z );
+    float tF = min( min( t2.x, t2.y ), t2.z );
+    if( tN>tF || tF<0.0) return vec2(-1.0); // no intersection
+    outNormal = (tN>=0.0) ? step(vec3(tN),t1) : // ro ouside the box
+                           step(t2,vec3(tF));  // ro inside the box
+    outNormal *= -sign(rd);
+    return vec2( tN, tF );
 }
 
-bool isSolid(ivec3 blockPos) {
+bool isSolid(ivec2 pixel) {
+    return texelFetch(VoxelDepthSampler, pixel, 0).r == 0.0;
+}
+
+struct Intersection {
+    bool hit;
+    mat3 tbn;
+    vec2 uv;
+    float dist;
+    ivec2 pixel;
+};
+
+Intersection noIntersection() {
+    Intersection res;
+    res.hit = false;
+    return res;
+}
+
+Intersection checkIntersection(ivec2 pixel, Ray ray) {
+    ivec3 raw = ivec3(texelFetch(VoxelSampler, pixel, 0).rgb * 255.0);
+    int index = raw.r | (raw.g << 8) | (raw.b << 16);
+    int count = int(texelFetch(Models, ivec2(0, index), 0).r * 255.0);
+    
+    float minT = -1.0;
+    vec2 uv;
+    vec3 tangent;
+    vec3 normal;
+    for (int i = 0; i < count; i++) {
+        const int bytesPerModel = 16;
+        
+        vec3 from = texelFetch(Models, ivec2(bytesPerModel * i + 1, index), 0).rgb * 3.0 - 1.0;
+        vec3 to = texelFetch(Models, ivec2(bytesPerModel * i + 2, index), 0).rgb * 3.0 - 1.0;
+        vec4 rotation = texelFetch(Models, ivec2(bytesPerModel * i + 3, index), 0);
+        vec3 pivot = texelFetch(Models, ivec2(bytesPerModel * i + 4, index), 0).rgb - 0.5;
+        
+        float angle = (rotation.w * 255.0 - 2.0) * ANGLE_22_5;
+        vec4 quaternion = vec4(
+            -rotation.xyz * sin(angle / 2.0),
+            cos(angle / 2.0)
+        );
+        
+        vec3 size = (to - from) / 2.0;
+        vec3 center = (from + to) / 2.0;
+        vec3 newNormal;
+        
+        vec3 ro = ray.origin - ray.cell - center - ray.direction * 0.2;
+        vec3 rd = ray.direction;
+        
+        ro -= pivot;
+        ro = quaternionRotate(ro, quaternion);
+        rd = quaternionRotate(rd, quaternion);
+        ro += pivot;
+
+        vec2 t = boxIntersection(ro, rd, size, newNormal);    
+        if (minT < 0.0 || (t.x >= 0.0 && t.x < minT)) {
+            vec3 hitPos = ro + rd * t.x;
+            if (clamp(hitPos, -0.501, 0.501) != hitPos) continue;
+            vec3 relativePos = (hitPos + size) / size / 2.0;
+            int faceID;
+            vec2 newUV;
+            vec3 newTangent;
+            if (newNormal.x > 0.99) {
+                faceID = 4;
+                newUV = vec2(1.0 - relativePos.z, 1.0 - relativePos.y);
+                newTangent = vec3(0.0, 0.0, -1.0); 
+            } else if (newNormal.x < -0.99) {
+                faceID = 5;
+                newUV = vec2(relativePos.z, 1.0 - relativePos.y);
+                newTangent = vec3(0.0, 0.0, 1.0);
+            } else if (newNormal.y > 0.99) {
+                faceID = 1;
+                newUV = vec2(relativePos.x, relativePos.z);
+                newTangent = vec3(1.0, 0.0, 0.0);
+            } else if (newNormal.y < -0.99) {
+                faceID = 0;
+                newUV = vec2(1.0 - relativePos.x, relativePos.z);
+                newTangent = vec3(-1.0, 0.0, 0.0);
+            } else if (newNormal.z > 0.99) {
+                faceID = 2;
+                newUV = vec2(relativePos.x, 1.0 - relativePos.y);
+                newTangent = vec3(1.0, 0.0, 0.0);
+            } else if (newNormal.z < -0.99) {
+                faceID = 3;
+                newUV = vec2(1.0 - relativePos.x, 1.0 - relativePos.y);
+                newTangent = vec3(-1.0, 0.0, 0.0);
+            }
+            ivec4 textureData = ivec4(texelFetch(Models, ivec2(bytesPerModel * i + 5 + faceID * 2, index), 0) * 255.0);            
+            if (textureData.a > 200)
+                continue;
+                
+            vec4 uvData = texelFetch(Models, ivec2(bytesPerModel * i + 5 + faceID * 2 + 1, index), 0);
+            int textureIndex = textureData.r | (textureData.g << 8) | (textureData.b << 16);
+            vec2 topLeft = vec2(textureIndex & 1023, (textureIndex >> 10) & 1023);
+            float size = exp2(float(textureIndex >> 20));
+            
+            newUV = (mix(uvData.xy, uvData.zw, newUV) * size + topLeft) * 16.0;
+            
+            if (texelFetch(Atlas, ivec2(newUV), 0).a < 0.5)
+                continue;
+
+            minT = t.x;
+            uv = newUV;
+
+            vec4 invQuaternion = vec4(-quaternion.xyz, quaternion.w);
+            newNormal = quaternionRotate(newNormal, invQuaternion);
+            newTangent = quaternionRotate(newTangent, invQuaternion);
+            normal = newNormal;
+            tangent = newTangent;
+        }
+    }
+
+    mat3 tbn = mat3(tangent, cross(normal, tangent), normal);
+    return Intersection(minT > 0.0, tbn, uv, minT - 0.2, pixel);
+}
+
+Intersection checkIntersection(Ray ray) {
     bool inside;
-    ivec2 cell = positionToCell(vec3(blockPos), inside);
-    if (!inside)
-        return false;
-    ivec2 pixel = cellToPixel(cell);
-    return texelFetch(DataDepthSampler, pixel, 0).r == 0.0;
+    ivec2 pixel = positionToPixel(vec3(ray.cell), inside);
+
+    if (!inside || !isSolid(pixel))
+        return noIntersection();
+
+    return checkIntersection(pixel, ray);
 }
 
 struct Material {
@@ -182,6 +220,18 @@ struct Material {
     bool metal;
 };
 
+Material defaultMaterial(vec3 normal) {
+    return Material(
+        vec3(1),
+        normal,
+        1.0,
+        0.0,
+        vec3(0.04),
+        0.0,
+        false
+    );
+}
+
 const vec3 PREDETERMINED_F0[] = vec3[](
     vec3(0.53123, 0.51236, 0.49583), // Iron
     vec3(0.94423, 0.77610, 0.37340), // Gold
@@ -193,35 +243,17 @@ const vec3 PREDETERMINED_F0[] = vec3[](
     vec3(0.96200, 0.94947, 0.92212)  // Silver
 );
 
-float luma(vec3 rgb) {
-    return dot(rgb, vec3(0.2125, 0.7154, 0.0721));
+mat3 getTBN(vec3 normal) {
+    float xSign = abs(normal.x) < 0.1 ? 0.0 : sign(normal.x);
+    float ySign = abs(normal.y) < 0.1 ? 0.0 : sign(normal.y);
+    float zSign = abs(normal.z) < 0.1 ? 0.0 : sign(normal.z);
+    vec3 tangent = vec3(zSign - ySign, 0, -xSign);
+    vec3 bitangent = cross(tangent, normal);
+    return mat3(tangent, bitangent, normal);
 }
 
-void getTangentBitangent(vec3 normal, out vec3 tangent, out vec3 bitangent) {
-    if (abs(normal.x) > 0.5) {
-        tangent = vec3(0, 0, 1);
-    } else {
-        tangent = vec3(1, 0, 0);
-    }
-    bitangent = cross(tangent, normal);
-}
-
-Material getMaterial(ivec3 blockPos, vec2 texCoord, vec3 geometryNormal) {
-    bool inside;
-    ivec2 cell = positionToCell(vec3(blockPos), inside);
-    ivec2 pixel = cellToPixel(cell);
-    if (!inside || texelFetch(DataDepthSampler, pixel, 0).r > 0.0) {
-        return Material(
-            vec3(1),
-            geometryNormal,
-            1.0,
-            0.5,
-            vec3(0.04),
-            0.0,
-            false
-        );
-    }
-    uvec4 dataRaw = uvec4(round(texelFetch(DataSampler, pixel, 0) * 255.0)) << uvec4(0u, 8u, 16u, 0u);
+Material getMaterial(Intersection intersection) {
+    uvec4 dataRaw = uvec4(round(texelFetch(VoxelSampler, intersection.pixel, 0) * 255.0)) << uvec4(0u, 8u, 16u, 0u);
     uint data = dataRaw.r | dataRaw.g | dataRaw.b;
     vec3 tintColor = vec3(
         float(dataRaw.a & 3u) / 3.0,
@@ -229,24 +261,25 @@ Material getMaterial(ivec3 blockPos, vec2 texCoord, vec3 geometryNormal) {
         float(dataRaw.a >> 5u) / 3.0
     );
     
-    int size = int(exp2(float(4u + (data >> 22u))));
-    ivec2 pos = ivec2(
-        data & 2047u,
-        (data >> 11u) & 2047u
-    ) * 16;
-    ivec2 atlasTexCoord = pos + ivec2(texCoord * size);
+    ivec2 atlasTexCoord = ivec2(intersection.uv);
     
-    vec3 albedo = pow(texelFetch(AlbedoAtlas, atlasTexCoord, 0).rgb * tintColor, vec3(GAMMA_CORRECTION));
-    vec3 normalData = texelFetch(NormalAtlas, atlasTexCoord, 0).rgb;
+    vec3 albedo = pow(texelFetch(Atlas, atlasTexCoord, 0).rgb * tintColor, vec3(GAMMA_CORRECTION));
+    vec3 normalData = texelFetch(Atlas, atlasTexCoord + ivec2(atlasSize.x, 0), 0).rgb;
+    vec3 normal;
+    float ambientOcclusion;
     if (dot(normalData.xy, normalData.xy) < 0.01) {
-        normalData.xy = vec2(0.5);
-        normalData.z = 1.0;
+        normal = intersection.tbn[2];
+        ambientOcclusion = 1.0;
+    } else {
+        normalData.xy = normalData.xy * 2.0 - 1.0;
+        normal = intersection.tbn * normalize(vec3(normalData.xy, sqrt(1.0 - dot(normalData.xy, normalData.xy)))),
+        ambientOcclusion = normalData.b;
     }
     
-    vec3 specularData = texelFetch(SpecularAtlas, atlasTexCoord, 0).rgb;
+    vec4 specularData = texelFetch(Atlas, atlasTexCoord + ivec2(0, atlasSize.y), 0);
     
-    vec3 F0 = vec3(specularData.y);
-    int index = int(round(specularData.y * 255.0));
+    vec3 F0 = vec3(specularData.g);
+    int index = int(round(specularData.g * 255.0));
     bool metal = index >= 230;
     if (index == 255) {
         F0 = albedo;
@@ -255,18 +288,13 @@ Material getMaterial(ivec3 blockPos, vec2 texCoord, vec3 geometryNormal) {
         F0 = PREDETERMINED_F0[index - 230];
     }
     
-    vec3 tangent, bitangent;
-    getTangentBitangent(geometryNormal, tangent, bitangent);
-    mat3 tbn = mat3(tangent, bitangent, geometryNormal);
-    normalData.xy = normalData.xy * 2.0 - 1.0;
-    
     return Material(
         albedo,
-        tbn * normalize(vec3(normalData.xy, sqrt(1.0 - dot(normalData.xy, normalData.xy)))),
-        normalData.z,
-        (1.0 - specularData.x) * (1.0 - specularData.x),
+        normal,
+        ambientOcclusion,
+        (1.0 - specularData.r) * (1.0 - specularData.r),
         F0,
-        specularData.z == 1.0 ? 0.0 : specularData.z,
+        specularData.a == 1.0 ? 0.0 : specularData.a,
         metal
     );
 }
@@ -284,10 +312,9 @@ Hit noHit() {
     return hit;
 }
 
-struct Ray {
-    vec3 origin;
-    ivec3 cell;
-    vec3 direction;
+struct PathTraceOutput {
+    vec3 radiance;
+    MaterialMaskData materialMask;
 };
 
 vec2 getTexCoord(vec3 pos, vec3 normal) {
@@ -303,40 +330,6 @@ vec2 getTexCoord(vec3 pos, vec3 normal) {
         max(-flatNormal.z, 0.0) * vec2(1.0 - fractPos.x, 1.0 - fractPos.y);
 }
 
-Hit raytrace(inout Ray ray) {
-    const int MAX_RT_STEPS = 55;
-    vec3 nextEdge = max(sign(ray.direction), 0.0);
-    vec3 steps = (nextEdge - fract(ray.origin)) / ray.direction;
-    vec3 originalStepSizes = abs(1.0 / ray.direction);
-    vec3 rdSign = sign(ray.direction);
-    
-    float t = 0.0;
-    for (int i = 0; i < MAX_RT_STEPS; i++) {
-        float stepSize = min(steps.x, min(steps.y, steps.z));
-        ray.origin += ray.direction * stepSize;
-        vec3 stepAxis = vec3(lessThanEqual(steps, vec3(stepSize)));
-        ivec3 nextCell = ray.cell + ivec3(stepAxis * rdSign);
-        t += stepSize;
-        
-        if (isSolid(nextCell)) {
-            vec3 normal = -stepAxis * rdSign;
-            vec2 texCoord = getTexCoord(ray.origin, normal);
-            ray.origin += normal * 0.001;
-            
-            Hit hit = Hit(true, t, normal, getMaterial(nextCell, texCoord, normal));
-            return hit;
-        }
-        
-        steps += originalStepSizes * stepAxis - stepSize;
-        ray.cell = nextCell;
-    }
-    return noHit();
-}
-
-vec3 fresnel(vec3 F0, float cosTheta) {
-    return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5);
-}
-
 float traceSteve(Ray ray, vec3 point, vec3 normal, out vec2 uv) {
     float t = dot(point - ray.origin, normal) / dot(ray.direction, normal);
     vec3 hitPoint = ray.origin + ray.direction * t;
@@ -345,60 +338,51 @@ float traceSteve(Ray ray, vec3 point, vec3 normal, out vec2 uv) {
     uv = vec2(dot(tangent, hitPoint - point), dot(-bitangent, hitPoint - point));
     uv *= vec2(1.0, 22.0 / 39.0) * 1.875;
     uv = uv * 0.5 + 0.5 - vec2(0, 0.35);
+    uv.x = 1.0 - uv.x;
     if (clamp(uv, vec2(0.0), vec2(1.0)) != uv)
         return -1.0;
     return t;
 }
 
-bool checkSun(vec3 hitPos, ivec3 hitCell) {
-    Ray sunRay = Ray(hitPos, hitCell, mix(cosineWeighted(sunDir), sunDir, SUN_SIZE_FACTOR));
-    return !raytrace(sunRay).hit;
-}
-
-vec3 getNextRayDirection(Material material, vec3 rayDir, vec3 geometryNormal) {
-    if (material.metal) {
-        vec3 reflected = reflect(rayDir, material.normal);
-        return mix(reflected, cosineWeighted(geometryNormal), material.roughness);
-    } else {
-        return cosineWeighted(material.normal);
-    }
-}
-
-vec3 pathtrace(vec3 playerPos, vec3 normal) {
-    vec2 texCoord = getTexCoord(playerPos - fract(chunkOffset), normal);
-    Material material = getMaterial(ivec3(floor(playerPos - fract(chunkOffset) - normal * 0.1)), texCoord, normal);
-    
-    vec3 radiance = material.albedo * material.emission * EMISSION_STRENGTH;
-    vec3 throughput = vec3(1.0);
-    
-    vec3 rayDir = getNextRayDirection(material, normalize(playerPos), normal);
-    throughput *= fresnel(material.F0, max(dot(-rayDir, normal), 0.0));
-    
-    Ray ray = Ray(playerPos - fract(chunkOffset), ivec3(floor(playerPos - fract(chunkOffset))), rayDir);
-    
-    if (!material.metal) {
-        if (checkSun(ray.origin, ray.cell)) {
-            radiance += max(dot(material.normal, sunDir), 0.0) / PI * throughput * SUN_INTENSITY * sunColor;
-        }
+Hit raytrace(inout Ray ray, bool checkSteve, int maxSteps) {
+    Intersection intersection = checkIntersection(ray);
+    if (intersection.dist > 0.01) {
+        vec3 normal = intersection.tbn[2];
+        ray.origin += normal * 0.01;
         
-        throughput *= material.ambientOcclusion;
+        Hit hit = Hit(true, intersection.dist, normal, getMaterial(intersection));
+        return hit;
     }
+
+    // Steve
+    vec2 steveUV;
+    float steveDist = checkSteve ? traceSteve(ray, -fract(chunkOffset), steveDirection, steveUV) : -1.0;
+    vec4 steveColor = checkSteve ? texture(SteveSampler, steveUV) : vec4(0.0);
     
-    for (int i = 0; i < 3; i++) {
-        vec2 steveUV;
-        vec3 steveNormal = -transpose(modelViewMat)[2].xyz;
-        float steveDist = traceSteve(ray, -fract(chunkOffset), steveNormal, steveUV);
-        vec4 steveColor = texture(SteveSampler, steveUV);
-        vec3 steveHitPoint = ray.origin + ray.direction * steveDist;
-        Hit hit = raytrace(ray);
-        if (steveDist > 0.0 && (!hit.hit || hit.t > steveDist) && steveColor.a > 0.0) {
-            hit = Hit(
+    // Voxel tracing
+    vec3 nextEdge = max(sign(ray.direction), 0.0);
+    vec3 steps = (nextEdge - fract(ray.origin)) / ray.direction;
+    vec3 originalStepSizes = abs(1.0 / ray.direction);
+    vec3 rdSign = sign(ray.direction);
+    
+    float dist = 0.0;
+    for (int i = 0; i < maxSteps; i++) {
+        float stepSize = min(steps.x, min(steps.y, steps.z));
+        ray.origin += ray.direction * stepSize;
+        vec3 stepAxis = vec3(lessThanEqual(steps, vec3(stepSize)));
+        ivec3 nextCell = ray.cell + ivec3(stepAxis * rdSign);
+        dist += stepSize;
+        
+        if (steveDist > 0.0 && dist > steveDist && steveColor.a > 0.0) {
+            ray.origin += ray.direction * steveDist + steveDirection * 0.01;
+            ray.cell = ivec3(floor(ray.origin));
+            return Hit(
                 true, 
                 steveDist, 
-                steveNormal, 
+                steveDirection, 
                 Material(
                     steveColor.rgb,
-                    steveNormal,
+                    steveDirection,
                     0.0,
                     0.5,
                     vec3(0.04),
@@ -406,60 +390,145 @@ vec3 pathtrace(vec3 playerPos, vec3 normal) {
                     false
                 )
             );
-            ray.origin = steveHitPoint + steveNormal * 0.01;
-            ray.cell = ivec3(floor(ray.origin));
-        } else if (!hit.hit) {
-            radiance += SKY_COLOR * throughput;
         }
+        
+        Intersection intersection = checkIntersection(Ray(ray.origin, nextCell, ray.direction));
+        if (intersection.hit) {
+            vec3 normal = intersection.tbn[2];
+            ray.origin += normal * 0.001;
+            
+            Hit hit = Hit(true, dist + intersection.dist, normal, getMaterial(intersection));
+            return hit;
+        }
+
+        ray.cell = nextCell;
+        steps += originalStepSizes * stepAxis - stepSize;
+    }
+    return noHit();
+}
+
+vec3 fresnel(vec3 F0, float cosTheta) {
+    return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5);
+}
+
+bool checkSun(vec3 hitPos, ivec3 hitCell, int maxSteps, vec3 normal, out float diffuse) {
+    vec3 dir = mix(cosineWeighted(sunDir), sunDir, SUN_SIZE_FACTOR);
+    diffuse = max(dot(dir, normal), 0.0);
+    if (diffuse <= 0.0)
+        return false;
+    Ray sunRay = Ray(hitPos, hitCell, dir);
+    return !raytrace(sunRay, true, maxSteps).hit;
+}
+
+vec3 getNextRayDirection(Material material, vec3 rayDir, vec3 geometryNormal) {
+    if (material.metal) {
+        vec3 reflected = reflect(rayDir, material.normal);
+        return mix(reflected, cosineWeighted(geometryNormal), material.roughness * 0.3);
+    } else {
+        return cosineWeighted(geometryNormal);
+    }
+}
+
+PathTraceOutput pathtrace(vec3 playerPos, vec3 normal) {
+    vec3 blockPos = playerPos - fract(chunkOffset);
+
+    Material material = defaultMaterial(normal);
+    material.albedo = pow(texture(DiffuseSampler, texCoord).rgb, vec3(GAMMA_CORRECTION));
+
+    vec3 rayDir = normalize(playerPos);
+    float dist = length(playerPos);
+    float offset = 0.0005 * dist * dist + 0.001;
+    Ray initialRay = Ray(blockPos - rayDir * 1.0, ivec3(floor(blockPos - normal * offset)), rayDir);
+    Intersection intersection = checkIntersection(initialRay);
+    if (intersection.hit) {
+        material = getMaterial(intersection);    
+    } else {
+        material.normal = normal;
+    }
+    
+    rayDir = getNextRayDirection(material, rayDir, normal);
+    vec3 radiance = vec3(0);
+    vec3 throughput = vec3(1.0);
+    
+    throughput *= fresnel(material.F0, max(dot(-rayDir, normal), 0.0));
+    
+    Ray ray = Ray(blockPos + normal * 0.01, ivec3(floor(blockPos + normal * 0.01)), rayDir);
+    
+    if (!material.metal) {
+        float diffuse = 0.0;
+        if (checkSun(ray.origin, ray.cell, 55, material.normal, diffuse)) {
+            radiance += diffuse / PI * throughput * SUN_INTENSITY * sunColor;
+        }        
+        throughput *= dot(rayDir, material.normal);
+    }
+
+    MaterialMaskData maskData = MaterialMaskData(
+        material.metal,
+        material.emission,
+        material.normal
+    );
+    
+    for (int i = 0; i < 3; i++) {
+        Hit hit = raytrace(ray, true, i < 2 ? 55 : 55);
+
+        if (!hit.hit) {
+            radiance += SKY_COLOR * throughput;
+            break;
+        }
+
         radiance += hit.material.emission * hit.material.albedo * throughput * EMISSION_STRENGTH;
         
         vec3 nextRayDir = getNextRayDirection(hit.material, ray.direction, hit.geometryNormal);
         
         throughput *= fresnel(hit.material.F0, max(dot(-nextRayDir, hit.geometryNormal), 0.0));
-        
         throughput *= hit.material.albedo;
         
-        if (checkSun(ray.origin, ray.cell)) {
-            radiance += max(dot(hit.material.normal, sunDir), 0.0) / PI * throughput * SUN_INTENSITY * sunColor;
+        float diffuse = 0.0;
+        if (!hit.material.metal && checkSun(ray.origin, ray.cell, i < 1 ? 55 : 25, hit.material.normal, diffuse)) {
+            radiance += diffuse / PI * throughput * SUN_INTENSITY * sunColor;
         }
         
         if (!material.metal) {
             throughput *= material.ambientOcclusion;
         }
+        float luma = dot(throughput, vec3(1.0)) / 3.0;
+        if (randFloat() > luma) {
+            break;
+        }
+        throughput /= luma;
         
         ray.direction = nextRayDir;
     }
-    return radiance;
+    return PathTraceOutput(radiance, maskData);
 }
 
-vec4 encodeHDRColor(vec3 color) {
-    uvec3 rawOutput = uvec3(round(color * 128.0)) << uvec3(0, 11, 22);
-    uint result = rawOutput.x | rawOutput.y | rawOutput.z;
-    return vec4(
-        result & 255u,
-        (result >> 8u) & 255u,
-        (result >> 16u) & 255u,
-        result >> 24u
-    ) / 255.0;
+float fresnel(float cosTheta, float F0) {
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
 void main() {
     ivec2 fragCoord = ivec2(gl_FragCoord.xy);
-    initRNG(uvec2(fragCoord), uvec2(InSize), frame);
+    initRNG(uvec2(fragCoord), uvec2(InSize), frame * 1000u);
     
-    float depth = texture(DiffuseDepthSampler, texCoord).r;
+    float depth = texture(DepthSampler, texCoord).r;
+    vec4 waterColor = texture(WaterSampler, texCoord);
+    float solidDepth;
     vec3 albedo = pow(texture(DiffuseSampler, texCoord).rgb, vec3(GAMMA_CORRECTION));
     if (depth == 1.0) {
-        fragColor = encodeHDRColor(albedo);
+        fragColor = encodeHDRColor(pow(albedo, vec3(1.5)));  
         return;
     }
     
     vec3 screenPos = vec3(texCoord, depth);
     vec3 viewPos = screenToView(screenPos, projInv);
-    vec3 playerPos = viewPos * mat3(modelViewMat);
-    vec3 normal = normalize(cross(dFdx(playerPos), dFdy(playerPos)));//getNormal(texCoord, depth, viewPos);
-    vec3 radiance = pathtrace(playerPos, normal);
+    vec3 playerPos = viewPos * modelViewMat;
+    vec3 normal =  normalize(
+        texture(NormalSampler, texCoord).rgb * 2.0 - 1.0
+    );
+
+    PathTraceOutput ptOutput = pathtrace(playerPos, normal);
+
+    gl_FragDepth = storeMaterialMask(ptOutput.materialMask);
     
-    vec3 outputColor = pow(radiance, vec3(1.0 / GAMMA_CORRECTION));
-    fragColor = encodeHDRColor(outputColor);
+    fragColor = encodeHDRColor(ptOutput.radiance);
 }

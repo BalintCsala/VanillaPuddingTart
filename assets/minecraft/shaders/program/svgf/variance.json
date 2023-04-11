@@ -1,0 +1,40 @@
+{
+    "blend": {
+        "func": "add",
+        "srcrgb": "one",
+        "dstrgb": "zero"
+    },
+    "vertex": "svgf/variance",
+    "fragment": "svgf/variance",
+    "attributes": [
+        "Position"
+    ],
+    "samplers": [
+        {
+            "name": "DiffuseSampler"
+        },
+        {
+            "name": "DepthSampler"
+        },
+        {
+            "name": "CounterSampler"
+        },
+        {
+            "name": "DataSampler"
+        },
+        {
+            "name": "PrevDataSampler"
+        }
+    ],
+    "uniforms": [
+        {
+            "name": "InSize",
+            "type": "float",
+            "count": 2,
+            "values": [
+                1.0,
+                1.0
+            ]
+        }
+    ]
+}

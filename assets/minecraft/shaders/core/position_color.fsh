@@ -1,4 +1,4 @@
-#version 150
+#version 420
 
 #moj_import <font.glsl>
 #moj_import <utils.glsl>

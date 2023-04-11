@@ -1,8 +1,10 @@
-#version 150
+#version 420
+
+#include<constants.glsl>
+#include<post/renderscale.glsl>
 
 const float PROJNEAR = 0.05;
 const float FPRECISION = 4000000.0;
-const float PI = 3.141592654;
 
 in vec4 Position;
 
@@ -10,11 +12,12 @@ uniform vec2 InSize;
 uniform sampler2D DataSampler;
 uniform sampler2D CounterSampler;
 uniform sampler2D SunSampler;
+uniform sampler2D Atlas;
 
 out vec2 texCoord;
 out vec3 sunDir;
 out mat4 projMat;
-out mat4 modelViewMat;
+out mat3 modelViewMat;
 out vec3 chunkOffset;
 out vec3 rayDir;
 out float near;
@@ -22,6 +25,9 @@ out float far;
 out mat4 projInv;
 flat out uint frame;
 out vec3 sunColor;
+out float renderScale;
+out vec3 steveDirection;
+flat out ivec2 atlasSize;
 
 uint readCounter() {
     uvec4 raw = uvec4(texelFetch(CounterSampler, ivec2(0), 0) * 255.0);
@@ -51,14 +57,14 @@ vec4[] OFFSETS = vec4[](
 
 void main() {
     vec4 outPos = OFFSETS[gl_VertexID];
-    gl_Position = vec4(outPos.xy, 0.2, 1.0);
     texCoord = outPos.xy * 0.5 + 0.5;
-
-    //simply decoding all the control data and constructing the sunDir, ProjMat, ModelViewMat
+    
     vec2 start = getControl(0, InSize);
     vec2 inc = vec2(2.0 / InSize.x, 0.0);
+    
+    renderScale = getRenderScale(DataSampler);
+    gl_Position = scaleClipPos(outPos, renderScale);
 
-    // ProjMat constructed assuming no translation or rotation matrices applied (aka no view bobbing).
     projMat = mat4(
         tan(decodeFloat(texture(DataSampler, start + 3.0 * inc).xyz)), decodeFloat(texture(DataSampler, start + 6.0 * inc).xyz), 0.0, 0.0,
         decodeFloat(texture(DataSampler, start + 5.0 * inc).xyz), tan(decodeFloat(texture(DataSampler, start + 4.0 * inc).xyz)), decodeFloat(texture(DataSampler, start + 7.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 8.0 * inc).xyz),
@@ -66,12 +72,19 @@ void main() {
         decodeFloat(texture(DataSampler, start + 13.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 14.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 15.0 * inc).xyz), 0.0
     );
 
-    modelViewMat = mat4(
-        decodeFloat(texture(DataSampler, start + 16.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 17.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 18.0 * inc).xyz), 0.0,
-        decodeFloat(texture(DataSampler, start + 19.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 20.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 21.0 * inc).xyz), 0.0,
-        decodeFloat(texture(DataSampler, start + 22.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 23.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 24.0 * inc).xyz), 0.0,
-        0.0, 0.0, 0.0, 1.0
+    modelViewMat = mat3(
+        decodeFloat(texture(DataSampler, start + 16.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 17.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 18.0 * inc).xyz),
+        decodeFloat(texture(DataSampler, start + 19.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 20.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 21.0 * inc).xyz),
+        decodeFloat(texture(DataSampler, start + 22.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 23.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 24.0 * inc).xyz)
     );
+    
+    vec3 forward = transpose(modelViewMat)[2];
+    vec3 up = transpose(modelViewMat)[1];
+    if (forward.y > 0.99) {
+        steveDirection = up;
+    } else {
+        steveDirection = normalize(vec3(forward.x, 0.0, forward.z));
+    }
 
     near = PROJNEAR;
     far = projMat[3][2] * near / (projMat[3][2] + 2.0 * near);
@@ -96,4 +109,6 @@ void main() {
     projInv = inverse(projMat);
     rayDir = (projInv * vec4(outPos.xy * (far - near), far + near, far - near)).xyz;
     frame = readCounter();
+
+    atlasSize = textureSize(Atlas, 0) / 2;
 }

@@ -1,7 +1,7 @@
-#version 150
+#version 420
 
-#moj_import <light.glsl>
-#moj_import <voxelization.glsl>
+#include<light.glsl>
+#include<voxelization.glsl>
 
 in vec3 Position;
 in vec4 Color;
@@ -11,7 +11,6 @@ in vec3 Normal;
 
 uniform sampler2D Sampler0;
 uniform sampler2D Sampler2;
-
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform vec3 ChunkOffset;
@@ -22,7 +21,6 @@ out vec4 vertexColor;
 out vec2 texCoord0;
 out float dataFace;
 out vec4 glpos;
-flat out int normalData;
 flat out ivec2 cell;
 
 const vec2[] OFFSETS = vec2[](
@@ -48,7 +46,7 @@ void main() {
             dataFace = 1.0;
             bool inside;
             
-            cell = positionToCell(floor(Position + floor(ChunkOffset)), inside);
+            cell = positionToCellStore(floor(Position + floor(ChunkOffset)), inside);
             if (!inside) {
                 gl_Position = vec4(5, 5, 0, 1);
                 return;
@@ -61,7 +59,7 @@ void main() {
         } else {
             // Data face used for chunk offset storage
             gl_Position = vec4(
-                offset * vec2(3, 1) / GRID_SIZE * 2.0 - 1.0,
+                offset * vec2(4, 1) / GRID_SIZE * 2.0 - 1.0,
                 -1,
                 1
             );
@@ -72,7 +70,6 @@ void main() {
         gl_Position = ProjMat * ModelViewMat * pos;
 
         vertexDistance = length((ModelViewMat * vec4(Position + ChunkOffset, 1.0)).xyz);
-        normalData = int(round(dot(abs(Normal), vec3(0, 1, 2)))) | (int(round(dot(Normal, vec3(1))) * 0.5 + 0.5) << 2);
     }
     glpos = gl_Position;
 }

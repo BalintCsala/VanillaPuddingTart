@@ -1,16 +1,20 @@
-#version 150
+#version 420
+
+#include<constants.glsl>
 
 const float PROJNEAR = 0.05;
 const float FPRECISION = 4000000.0;
-const float PI = 3.141592654;
 
 in vec4 Position;
 
-uniform sampler2D DiffuseSampler;
+uniform sampler2D DataSampler;
 uniform vec2 InSize;
 
 out vec2 texCoord;
 out mat4 projInv;
+out mat3 modelViewMat;
+out float near;
+out float far;
 
 int decodeInt(vec3 ivec) {
     ivec *= 255.0;
@@ -41,14 +45,23 @@ void main() {
     //simply decoding all the control data and constructing the sunDir, ProjMat, ModelViewMat
     vec2 start = getControl(0, InSize);
     vec2 inc = vec2(2.0 / InSize.x, 0.0);
-
+    
     // ProjMat constructed assuming no translation or rotation matrices applied (aka no view bobbing).
     mat4 projMat = mat4(
-        tan(decodeFloat(texture(DiffuseSampler, start + 3.0 * inc).xyz)), decodeFloat(texture(DiffuseSampler, start + 6.0 * inc).xyz), 0.0, 0.0,
-        decodeFloat(texture(DiffuseSampler, start + 5.0 * inc).xyz), tan(decodeFloat(texture(DiffuseSampler, start + 4.0 * inc).xyz)), decodeFloat(texture(DiffuseSampler, start + 7.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 8.0 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 9.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 10.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 11.0 * inc).xyz),  decodeFloat(texture(DiffuseSampler, start + 12.0 * inc).xyz),
-        decodeFloat(texture(DiffuseSampler, start + 13.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 14.0 * inc).xyz), decodeFloat(texture(DiffuseSampler, start + 15.0 * inc).xyz), 0.0
+        tan(decodeFloat(texture(DataSampler, start + 3.0 * inc).xyz)), decodeFloat(texture(DataSampler, start + 6.0 * inc).xyz), 0.0, 0.0,
+        decodeFloat(texture(DataSampler, start + 5.0 * inc).xyz), tan(decodeFloat(texture(DataSampler, start + 4.0 * inc).xyz)), decodeFloat(texture(DataSampler, start + 7.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 8.0 * inc).xyz),
+        decodeFloat(texture(DataSampler, start + 9.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 10.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 11.0 * inc).xyz),  decodeFloat(texture(DataSampler, start + 12.0 * inc).xyz),
+        decodeFloat(texture(DataSampler, start + 13.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 14.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 15.0 * inc).xyz), 0.0
+    );
+
+    modelViewMat = mat3(
+        decodeFloat(texture(DataSampler, start + 16.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 17.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 18.0 * inc).xyz), 
+        decodeFloat(texture(DataSampler, start + 19.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 20.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 21.0 * inc).xyz),
+        decodeFloat(texture(DataSampler, start + 22.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 23.0 * inc).xyz), decodeFloat(texture(DataSampler, start + 24.0 * inc).xyz)
     );
 
     projInv = inverse(projMat);
+    near = PROJNEAR;
+    far = projMat[3][2] * near / (projMat[3][2] + 2.0 * near);
+
 }

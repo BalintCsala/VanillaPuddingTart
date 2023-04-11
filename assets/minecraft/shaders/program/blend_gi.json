@@ -8,7 +8,10 @@
     "fragment": "blend_gi",
     "attributes": [ "Position" ],
     "samplers": [
+        { "name": "DataSampler"},
         { "name": "DiffuseSampler" },
+        { "name": "WaterSampler" },
+        { "name": "MaterialMask" },
         { "name": "GISampler" }
     ],
     "uniforms": [

@@ -1,8 +1,9 @@
 uint state;
 
 uint rand() {
-	state = (state << 13U) ^ state;
-    state = state * (state * state * 15731U + 789221U) + 1376312589U;
+	uint newState = state * uint(747796405) + uint(2891336453);
+	uint word = ((newState >> ((newState >> uint(28)) + uint(4))) ^ newState) * uint(277803737);
+    state = (word >> uint(22)) ^ word;
     return state;
 }
 

@@ -9,9 +9,7 @@
     "attributes": [ "Position" ],
     "samplers": [
         { "name": "DiffuseSampler" },
-        { "name": "DiffuseDepthSampler" },
-        { "name": "TranslucentSampler" },
-        { "name": "TranslucentDepthSampler" },
+        { "name": "DepthSampler" },
         { "name": "ItemEntitySampler" },
         { "name": "ItemEntityDepthSampler" },
         { "name": "ParticlesSampler" },
@@ -19,7 +17,8 @@
         { "name": "CloudsSampler" },
         { "name": "CloudsDepthSampler" },
         { "name": "WeatherSampler" },
-        { "name": "WeatherDepthSampler" }
+        { "name": "WeatherDepthSampler" },
+        { "name": "Atlas" }
     ],
     "uniforms": [
         { "name": "ProjMat",    "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
